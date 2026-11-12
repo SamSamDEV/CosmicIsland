@@ -2,6 +2,8 @@ package fr.cosmicisland;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import fr.cosmicisland.game.GameRegistry;
+import fr.cosmicisland.game.SpawnManager;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -53,6 +55,11 @@ public final class KLFiles {
 
     public static void save(String file, Object data) {
         Path path = dir().resolve(file);
+        try {
+            Files.createDirectories(path.getParent());
+        } catch (IOException e) {
+            CosmicIsland.LOGGER.error("Impossible de creer le dossier de {}", path, e);
+        }
         try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             GSON.toJson(data, writer);
         } catch (IOException e) {
@@ -66,5 +73,7 @@ public final class KLFiles {
         KLPermissions.load();
         RoleManager.load();
         TeamManager.load();
+        SpawnManager.load();
+        GameRegistry.loadConfigs();
     }
 }

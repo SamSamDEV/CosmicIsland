@@ -15,6 +15,10 @@ import net.minecraft.commands.arguments.GameProfileArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
+import fr.cosmicisland.game.GameConfig;
+import fr.cosmicisland.game.GameManager;
+import fr.cosmicisland.game.GameRegistry;
+import fr.cosmicisland.game.SpawnManager;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -40,6 +44,49 @@ public final class KLCommand {
                 .then(Commands.literal("reload")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .executes(KLCommand::reload))
+                .then(Commands.literal("games")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .executes(KLCommand::gameList))
+                .then(Commands.literal("enable")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .then(Commands.argument("jeu", StringArgumentType.word())
+                                .suggests(GAME_IDS)
+                                .executes(c -> setEnabled(c, true))))
+                .then(Commands.literal("disable")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .then(Commands.argument("jeu", StringArgumentType.word())
+                                .suggests(GAME_IDS)
+                                .executes(c -> setEnabled(c, false))))
+                .then(Commands.literal("start")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .then(Commands.argument("jeu", StringArgumentType.word())
+                                .suggests(GAME_IDS)
+                                .executes(KLCommand::gameStart)))
+                .then(Commands.literal("go")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .executes(KLCommand::gameGo))
+                .then(Commands.literal("stop")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .executes(c -> gameStop(c, null))
+                        .then(Commands.argument("jeu", StringArgumentType.word())
+                                .suggests(GAME_IDS)
+                                .executes(c -> gameStop(c, StringArgumentType.getString(c, "jeu")))))
+                .then(Commands.literal("join")
+                        .executes(KLCommand::gameJoin))
+                .then(Commands.literal("decline")
+                        .executes(KLCommand::gameDecline))
+                .then(Commands.literal("spawn")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .then(Commands.literal("set")
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(KLCommand::spawnSet)))
+                        .then(Commands.literal("tp")
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(KLCommand::spawnTp)))
+                        .then(Commands.literal("list")
+                                .executes(KLCommand::spawnList)))
                 .then(Commands.literal("role")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .then(Commands.literal("set")
@@ -278,6 +325,145 @@ public final class KLCommand {
         }
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Fusion effectuée : tous les joueurs sont dans l'équipe " + TeamManager.MERGED_ID + "."), true);
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- epreuves
+
+    private static final SuggestionProvider<CommandSourceStack> GAME_IDS =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(GameRegistry.ids(), builder);
+
+    private static int gameList(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        src.sendSuccess(() -> Component.literal("=== Épreuves ===")
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+        for (String id : GameRegistry.ids()) {
+            GameConfig c = GameRegistry.config(id);
+            if (c == null) {
+                continue;
+            }
+            Component status = c.enabled
+                    ? Component.literal("ACTIVÉ").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD)
+                    : Component.literal("DÉSACTIVÉ").withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+            Component row = Component.empty()
+                    .append(Component.literal(c.displayName + " (" + id + ") : ").withStyle(ChatFormatting.WHITE))
+                    .append(status);
+            src.sendSuccess(() -> row, false);
+        }
+        String active = GameManager.describe();
+        src.sendSuccess(() -> line("Épreuve en cours", Component.literal(active).withStyle(ChatFormatting.YELLOW)), false);
+        return 1;
+    }
+
+    private static int setEnabled(CommandContext<CommandSourceStack> ctx, boolean enabled) {
+        String id = StringArgumentType.getString(ctx, "jeu");
+        GameConfig c = GameRegistry.config(id);
+        if (c == null) {
+            ctx.getSource().sendFailure(Component.literal("Jeu inconnu : " + id));
+            return 0;
+        }
+        c.enabled = enabled;
+        GameRegistry.saveConfig(id);
+        String msg = "Jeu " + c.displayName + (enabled ? " activé." : " désactivé.");
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    private static int gameStart(CommandContext<CommandSourceStack> ctx) {
+        String err = GameManager.start(StringArgumentType.getString(ctx, "jeu"));
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int gameGo(CommandContext<CommandSourceStack> ctx) {
+        String err = GameManager.go();
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("Décompte lancé."), true);
+        return 1;
+    }
+
+    private static int gameStop(CommandContext<CommandSourceStack> ctx, String id) {
+        if (GameManager.state() == GameManager.State.IDLE) {
+            ctx.getSource().sendFailure(Component.literal("Aucune épreuve en cours."));
+            return 0;
+        }
+        if (id != null && !GameManager.isActive(id)) {
+            ctx.getSource().sendFailure(Component.literal("L'épreuve en cours n'est pas : " + id));
+            return 0;
+        }
+        GameManager.finish(true);
+        return 1;
+    }
+
+    private static int gameJoin(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String err = GameManager.join(ctx.getSource().getPlayerOrException());
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int gameDecline(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String err = GameManager.decline(ctx.getSource().getPlayerOrException());
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- spawns
+
+    private static int spawnSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        SpawnManager.set(StringArgumentType.getString(ctx, "equipe"), player);
+        String msg = "Spawn de l'équipe " + team.name + " défini à ta position.";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    private static int spawnTp(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        SpawnManager.Spawn spawn = SpawnManager.get(StringArgumentType.getString(ctx, "equipe"));
+        if (spawn == null) {
+            ctx.getSource().sendFailure(Component.literal("Spawn non défini pour l'équipe " + team.name + "."));
+            return 0;
+        }
+        if (!SpawnManager.teleport(ctx.getSource().getServer(), player, spawn)) {
+            ctx.getSource().sendFailure(Component.literal("Dimension du spawn introuvable : " + spawn.dimension));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int spawnList(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        src.sendSuccess(() -> Component.literal("=== Spawns d'équipe ===")
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+        for (Map.Entry<String, TeamManager.KLTeam> e : TeamManager.all().entrySet()) {
+            SpawnManager.Spawn s = SpawnManager.get(e.getKey());
+            Component value = s == null
+                    ? Component.literal("non défini").withStyle(ChatFormatting.RED)
+                    : Component.literal(String.format("%s  %.1f %.1f %.1f", s.dimension, s.x, s.y, s.z))
+                            .withStyle(ChatFormatting.GREEN);
+            Component row = line(e.getValue().name, value);
+            src.sendSuccess(() -> row, false);
+        }
         return 1;
     }
 }
