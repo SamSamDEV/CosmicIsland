@@ -69,4 +69,19 @@ public final class RoleManager {
     public static void onJoin(ServerPlayer player) {
         apply(player, effective(player));
     }
+
+    /** Joueurs enregistres avec le role participant (uuid -> pseudo). */
+    public static Map<UUID, String> participants() {
+        Map<UUID, String> map = new LinkedHashMap<>();
+        for (Map.Entry<String, Entry> e : store.players.entrySet()) {
+            if (e.getValue().role == KLRole.PARTICIPANT) {
+                try {
+                    map.put(UUID.fromString(e.getKey()), e.getValue().name);
+                } catch (IllegalArgumentException ignored) {
+                    // cle invalide dans players.json : ignoree
+                }
+            }
+        }
+        return map;
+    }
 }

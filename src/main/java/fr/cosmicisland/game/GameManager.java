@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,6 +49,7 @@ public final class GameManager {
     private static final Set<UUID> invited = new LinkedHashSet<>();
     private static final Set<UUID> joined = new LinkedHashSet<>();
     private static final Set<UUID> declined = new HashSet<>();
+    private static final Map<UUID, String> joinedNames = new LinkedHashMap<>();
 
     private static int ticks;
     private static int countdownValue;
@@ -180,6 +182,7 @@ public final class GameManager {
         invited.clear();
         joined.clear();
         declined.clear();
+        joinedNames.clear();
         invited.addAll(targets);
 
         for (UUID id : targets) {
@@ -226,6 +229,7 @@ public final class GameManager {
 
         declined.remove(id);
         joined.add(id);
+        joinedNames.put(id, player.getGameProfile().getName());
         GameMessages.send(cfg, "joined", player);
         checkAllAnswered();
         return null;
@@ -283,8 +287,16 @@ public final class GameManager {
         KLGame g = game;
         GameConfig c = cfg;
         boolean wasRunning = state == State.RUNNING;
+        int durationSeconds = ticks / 20;
+        Map<UUID, String> participantNames = new LinkedHashMap<>(joinedNames);
+        GameResult result = null;
 
         if (wasRunning) {
+            try {
+                result = g.buildResult(CONTEXT, cancelled);
+            } catch (Exception e) {
+                CosmicIsland.LOGGER.error("Erreur dans buildResult du jeu {}", g.id(), e);
+            }
             try {
                 g.onStop(CONTEXT, cancelled);
             } catch (Exception e) {
@@ -301,6 +313,9 @@ public final class GameManager {
             InventoryStore.restore(server, p);
         }
 
+        if (wasRunning) {
+            RankingManager.record(g.id(), c, result, cancelled, durationSeconds, participantNames);
+        }
         unfreeze();
         removeTimerBar();
         String name = c.displayName;
@@ -310,6 +325,7 @@ public final class GameManager {
         invited.clear();
         joined.clear();
         declined.clear();
+        joinedNames.clear();
         notifyStaff((cancelled ? "&cÉpreuve arrêtée" : "&aÉpreuve terminée") + "&7 : &f" + name);
     }
 

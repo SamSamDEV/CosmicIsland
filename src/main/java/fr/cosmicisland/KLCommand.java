@@ -2,6 +2,7 @@ package fr.cosmicisland;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -20,11 +21,15 @@ import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.GameManager;
 import fr.cosmicisland.game.GameRegistry;
 import fr.cosmicisland.game.KLGame;
+import fr.cosmicisland.game.Placeholders;
+import fr.cosmicisland.game.RankingManager;
 import fr.cosmicisland.game.SpawnManager;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class KLCommand {
     private static final SuggestionProvider<CommandSourceStack> TEAM_IDS =
@@ -95,6 +100,33 @@ public final class KLCommand {
                                         .executes(KLCommand::spawnTp)))
                         .then(Commands.literal("list")
                                 .executes(KLCommand::spawnList)))
+                .then(Commands.literal("ranking")
+                        .executes(c -> rankingTop(c, null))
+                        .then(Commands.literal("jeu")
+                                .then(Commands.argument("jeu", StringArgumentType.word())
+                                        .suggests(GAME_IDS)
+                                        .executes(c -> rankingTop(c, StringArgumentType.getString(c, "jeu")))))
+                        .then(Commands.literal("joueur")
+                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                        .executes(KLCommand::rankingPlayer)))
+                        .then(Commands.literal("reset")
+                                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                                .then(Commands.literal("confirm")
+                                        .executes(KLCommand::rankingResetConfirm))
+                                .then(Commands.argument("cible", StringArgumentType.word())
+                                        .suggests(RANK_TARGETS)
+                                        .executes(KLCommand::rankingResetAsk)))
+                        .then(Commands.literal("add")
+                                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                        .then(Commands.argument("jeu", StringArgumentType.word())
+                                                .suggests(GAME_IDS)
+                                                .then(Commands.argument("nombre", IntegerArgumentType.integer(-100, 100))
+                                                        .executes(KLCommand::rankingAdd))))))
+                .then(Commands.literal("placeholder")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .then(Commands.argument("texte", StringArgumentType.greedyString())
+                                .executes(KLCommand::placeholderTest)))
                 .then(Commands.literal("role")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .then(Commands.literal("set")
@@ -497,6 +529,127 @@ public final class KLCommand {
     private static int gameUnfreeze(CommandContext<CommandSourceStack> ctx) {
         GameManager.unfreeze();
         ctx.getSource().sendSuccess(() -> Component.literal("Participants libérés."), true);
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- classement
+
+    private static final SuggestionProvider<CommandSourceStack> RANK_TARGETS =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(
+                    Stream.concat(Stream.of("all"), GameRegistry.ids().stream()), builder);
+
+    private static String sourceKey(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getSource().getEntity() instanceof ServerPlayer p ? p.getUUID().toString() : "console";
+    }
+
+    private static int rankingTop(CommandContext<CommandSourceStack> ctx, String gameId) {
+        CommandSourceStack src = ctx.getSource();
+        String title = "Classement général";
+        if (gameId != null) {
+            GameConfig c = GameRegistry.config(gameId);
+            if (c == null) {
+                src.sendFailure(Component.literal("Jeu inconnu : " + gameId));
+                return 0;
+            }
+            title = "Classement - " + c.displayName;
+        }
+        String header = "=== " + title + " ===";
+        src.sendSuccess(() -> Component.literal(header).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+
+        List<RankingManager.Row> rows = RankingManager.top(gameId, 10);
+        if (rows.isEmpty()) {
+            src.sendSuccess(() -> Component.literal("Aucun joueur enregistré.").withStyle(ChatFormatting.GRAY), false);
+            return 0;
+        }
+        int rank = 1;
+        for (RankingManager.Row row : rows) {
+            ChatFormatting color = rank == 1 ? ChatFormatting.GOLD
+                    : rank == 2 ? ChatFormatting.GRAY
+                    : rank == 3 ? ChatFormatting.DARK_RED : ChatFormatting.DARK_GRAY;
+            String wins = row.wins() + (row.wins() > 1 ? " victoires" : " victoire");
+            Component line = Component.empty()
+                    .append(Component.literal("#" + rank + " ").withStyle(color, ChatFormatting.BOLD))
+                    .append(Component.literal(row.name() == null ? "?" : row.name()).withStyle(ChatFormatting.WHITE))
+                    .append(Component.literal("  " + wins).withStyle(ChatFormatting.GREEN));
+            src.sendSuccess(() -> line, false);
+            rank++;
+        }
+        return rows.size();
+    }
+
+    private static int rankingPlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        for (GameProfile profile : profiles) {
+            RankingManager.PlayerStats s = RankingManager.statsOf(profile.getId());
+            int total = s == null ? 0 : s.wins;
+            int played = s == null ? 0 : s.played;
+            Component summary = line(profile.getName(), Component.literal(
+                    total + " victoire(s) sur " + played + " épreuve(s)").withStyle(ChatFormatting.GREEN));
+            ctx.getSource().sendSuccess(() -> summary, false);
+            if (s != null) {
+                for (Map.Entry<String, Integer> e : s.perGame.entrySet()) {
+                    GameConfig c = GameRegistry.config(e.getKey());
+                    String name = c == null ? e.getKey() : c.displayName;
+                    Component detail = Component.literal("  - " + name + " : " + e.getValue())
+                            .withStyle(ChatFormatting.GRAY);
+                    ctx.getSource().sendSuccess(() -> detail, false);
+                }
+            }
+        }
+        return profiles.size();
+    }
+
+    private static int rankingAdd(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        String game = StringArgumentType.getString(ctx, "jeu").toLowerCase();
+        int n = IntegerArgumentType.getInteger(ctx, "nombre");
+        if (GameRegistry.get(game) == null) {
+            ctx.getSource().sendFailure(Component.literal("Jeu inconnu : " + game));
+            return 0;
+        }
+        for (GameProfile profile : profiles) {
+            RankingManager.add(profile, game, n);
+        }
+        String msg = profiles.size() + " joueur(s) : " + (n >= 0 ? "+" : "") + n + " victoire(s) pour " + game;
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return profiles.size();
+    }
+
+    private static int rankingResetAsk(CommandContext<CommandSourceStack> ctx) {
+        String target = StringArgumentType.getString(ctx, "cible").toLowerCase();
+        if (!target.equals("all") && GameRegistry.get(target) == null) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Cible inconnue : " + target + " (utilise all ou l'identifiant d'un jeu)."));
+            return 0;
+        }
+        RankingManager.requestReset(sourceKey(ctx), target);
+        Component msg = Component.empty()
+                .append(Component.literal("ATTENTION ").withStyle(ChatFormatting.RED, ChatFormatting.BOLD))
+                .append(Component.literal("Remise à zéro de '" + target + "'. Tape ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("/kl ranking reset confirm").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD))
+                .append(Component.literal(" dans les 30 secondes pour confirmer (copie de secours automatique).")
+                        .withStyle(ChatFormatting.GRAY));
+        ctx.getSource().sendSuccess(() -> msg, false);
+        return 1;
+    }
+
+    private static int rankingResetConfirm(CommandContext<CommandSourceStack> ctx) {
+        RankingManager.ResetResult r = RankingManager.confirmReset(sourceKey(ctx));
+        if (r == null) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Aucune remise à zéro en attente (elle expire au bout de 30 secondes)."));
+            return 0;
+        }
+        String msg = "Classement remis à zéro (" + r.target() + "). Copie de secours : "
+                + (r.backup() == null ? "aucune" : r.backup());
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    private static int placeholderTest(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        String result = Placeholders.apply(StringArgumentType.getString(ctx, "texte"), player);
+        ctx.getSource().sendSuccess(() -> fr.cosmicisland.Txt.of(result), false);
         return 1;
     }
 }

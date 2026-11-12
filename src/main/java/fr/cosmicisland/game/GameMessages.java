@@ -26,10 +26,11 @@ public final class GameMessages {
                 team = TeamManager.get(teamId).name;
             }
         }
-        return text
+        String base = text
                 .replace("{jeu}", cfg.displayName)
                 .replace("{joueur}", player == null ? "" : player.getGameProfile().getName())
                 .replace("{equipe}", team);
+        return Placeholders.apply(base, player);
     }
 
     /** Envoie le message "key" de la config a un joueur. Ne fait rien si le message est vide ou absent. */

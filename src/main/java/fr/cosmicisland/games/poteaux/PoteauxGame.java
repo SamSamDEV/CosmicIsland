@@ -1,5 +1,6 @@
 package fr.cosmicisland.games.poteaux;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -11,6 +12,7 @@ import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.GameContext;
 import fr.cosmicisland.game.GameManager;
 import fr.cosmicisland.game.GameMessages;
+import fr.cosmicisland.game.GameResult;
 import fr.cosmicisland.game.GameRegistry;
 import fr.cosmicisland.game.KLGame;
 import fr.cosmicisland.game.SpawnManager;
@@ -48,6 +50,7 @@ public class PoteauxGame implements KLGame {
 
     private static class Contestant {
         final UUID id;
+        final String name;
         final String group; // equipe (mode equipes) ou identifiant du joueur (mode solo)
         int errors = 0;
         boolean alive = true;
@@ -55,15 +58,20 @@ public class PoteauxGame implements KLGame {
         boolean falling = false;
         int fallTicks = 0;
 
-        Contestant(UUID id, String group) {
+        Contestant(UUID id, String name, String group) {
             this.id = id;
+            this.name = name;
             this.group = group;
         }
     }
 
     private record Zone(String dimension, AABB box) {}
 
+    private record Elimination(UUID id, String name, double seconds, String reason, int errors) {}
+
     private final Map<UUID, Contestant> contestants = new LinkedHashMap<>();
+    private final List<Elimination> eliminations = new ArrayList<>();
+    private int arrowsShown = 0;
     private Random random = new Random();
     private boolean teamMode = true;
     private int initialGroups = 0;
@@ -152,6 +160,8 @@ public class PoteauxGame implements KLGame {
     public void onStart(GameContext ctx) {
         GameConfig cfg = ctx.config();
         contestants.clear();
+        eliminations.clear();
+        arrowsShown = 0;
         random = new Random();
         teamMode = !TeamManager.isMerged();
         tickCounter = 0;
@@ -164,7 +174,7 @@ public class PoteauxGame implements KLGame {
         for (ServerPlayer p : ctx.participants()) {
             String team = TeamManager.teamIdOf(p.getUUID());
             String group = (teamMode && team != null) ? team : p.getUUID().toString();
-            contestants.put(p.getUUID(), new Contestant(p.getUUID(), group));
+            contestants.put(p.getUUID(), new Contestant(p.getUUID(), p.getGameProfile().getName(), group));
             groups.add(group);
             sendState(p, true, 0, 0);
         }
@@ -186,13 +196,13 @@ public class PoteauxGame implements KLGame {
                 continue;
             }
             if (p.isInWater() && (zone == null || inZone(p, zone))) {
-                eliminate(c, p);
+                eliminate(c, p, c.falling ? "perte d'équilibre" : "tombé à l'eau");
                 continue;
             }
             if (c.falling) {
                 c.fallTicks--;
                 if (c.fallTicks <= 0) {
-                    eliminate(c, p);
+                    eliminate(c, p, "perte d'équilibre (délai)");
                 }
             }
         }
@@ -222,13 +232,89 @@ public class PoteauxGame implements KLGame {
             }
         }
         contestants.clear();
+        eliminations.clear();
         arrowActive = false;
+    }
+
+    /** Resultat envoye au moteur : vainqueurs, classement complet et details (eliminations, erreurs). */
+    @Override
+    public GameResult buildResult(GameContext ctx, boolean cancelled) {
+        GameResult r = new GameResult();
+        r.teamMode = teamMode;
+        String winner = cancelled ? null : computeWinner();
+        if (winner != null) {
+            for (Contestant c : contestants.values()) {
+                if (c.group.equals(winner)) {
+                    r.winners.add(c.id);
+                }
+            }
+            if (teamMode && TeamManager.get(winner) != null) {
+                r.winnerTeam = winner;
+            }
+        }
+
+        // Classement : survivants (moins d'erreurs d'abord), puis elimines du dernier au premier
+        List<Contestant> survivors = new ArrayList<>();
+        for (Contestant c : contestants.values()) {
+            if (c.alive) {
+                survivors.add(c);
+            }
+        }
+        survivors.sort((a, b) -> Integer.compare(a.errors, b.errors));
+        for (Contestant c : survivors) {
+            r.placements.add(c.id);
+        }
+        for (int i = eliminations.size() - 1; i >= 0; i--) {
+            r.placements.add(eliminations.get(i).id());
+        }
+
+        JsonArray elim = new JsonArray();
+        for (Elimination e : eliminations) {
+            JsonObject o = new JsonObject();
+            o.addProperty("player", e.name());
+            o.addProperty("secondes", Math.round(e.seconds() * 10.0) / 10.0);
+            o.addProperty("raison", e.reason());
+            o.addProperty("erreurs", e.errors());
+            elim.add(o);
+        }
+        r.details.add("eliminations", elim);
+        JsonObject errors = new JsonObject();
+        for (Contestant c : contestants.values()) {
+            errors.addProperty(c.name, c.errors);
+        }
+        r.details.add("erreursParJoueur", errors);
+        r.details.addProperty("fleches", arrowsShown);
+        return r;
+    }
+
+    /** Groupe vainqueur (le plus de joueurs encore debout), ou null en cas d'egalite ou si personne ne reste. */
+    private String computeWinner() {
+        Map<String, Integer> alive = new LinkedHashMap<>();
+        for (Contestant c : contestants.values()) {
+            if (c.alive) {
+                alive.merge(c.group, 1, Integer::sum);
+            }
+        }
+        String winner = null;
+        int best = 0;
+        boolean tie = false;
+        for (Map.Entry<String, Integer> e : alive.entrySet()) {
+            if (e.getValue() > best) {
+                best = e.getValue();
+                winner = e.getKey();
+                tie = false;
+            } else if (e.getValue() == best) {
+                tie = true;
+            }
+        }
+        return (winner == null || tie) ? null : winner;
     }
 
     // ------------------------------------------------------------ rythme
 
     private void startArrow(GameConfig cfg) {
         arrowDir = random.nextInt(4);
+        arrowsShown++;
         arrowActive = true;
         int grace = Math.max(0, (int) Math.ceil(num(cfg, "graceMs", 150) / 50.0));
         arrowResolveTick = tickCounter + ticks(windowMs) + grace;
@@ -291,6 +377,7 @@ public class PoteauxGame implements KLGame {
         c.errors++;
         if (p == null) {
             c.alive = false; // joueur deconnecte
+            eliminations.add(new Elimination(c.id, c.name, tickCounter / 20.0, "déconnecté", c.errors));
             return;
         }
         GameMessages.playSound(p, "minecraft:block.note_block.bass", 0.7f);
@@ -313,9 +400,10 @@ public class PoteauxGame implements KLGame {
         GameMessages.send(cfg, "fall", p);
     }
 
-    private void eliminate(Contestant c, ServerPlayer p) {
+    private void eliminate(Contestant c, ServerPlayer p, String reason) {
         GameConfig cfg = GameManager.config();
         c.alive = false;
+        eliminations.add(new Elimination(c.id, c.name, tickCounter / 20.0, reason, c.errors));
         PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(-1, 0));
         sendState(p, false, c.errors, 0);
         if (cfg != null) {
@@ -355,25 +443,8 @@ public class PoteauxGame implements KLGame {
 
     /** Vainqueur = groupe avec le plus de joueurs encore debout. Egalite = pas de vainqueur. */
     private void announce(GameConfig cfg) {
-        Map<String, Integer> alive = new LinkedHashMap<>();
-        for (Contestant c : contestants.values()) {
-            if (c.alive) {
-                alive.merge(c.group, 1, Integer::sum);
-            }
-        }
-        String winner = null;
-        int best = 0;
-        boolean tie = false;
-        for (Map.Entry<String, Integer> e : alive.entrySet()) {
-            if (e.getValue() > best) {
-                best = e.getValue();
-                winner = e.getKey();
-                tie = false;
-            } else if (e.getValue() == best) {
-                tie = true;
-            }
-        }
-        if (winner == null || tie) {
+        String winner = computeWinner();
+        if (winner == null) {
             for (Contestant c : contestants.values()) {
                 ServerPlayer p = online(c);
                 if (p != null) {

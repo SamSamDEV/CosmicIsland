@@ -38,4 +38,12 @@ public interface KLGame {
     default LiteralArgumentBuilder<CommandSourceStack> commands() {
         return null;
     }
+
+    /**
+     * Appele par le moteur a la fin d'une epreuve qui a demarre (avant onStop). Le jeu retourne son resultat
+     * (vainqueurs, classement, details) pour enregistrer victoires et logs. null = aucun resultat.
+     */
+    default GameResult buildResult(GameContext ctx, boolean cancelled) {
+        return null;
+    }
 }

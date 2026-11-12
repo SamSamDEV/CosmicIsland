@@ -3,6 +3,7 @@ package fr.cosmicisland;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import fr.cosmicisland.game.GameRegistry;
+import fr.cosmicisland.game.RankingManager;
 import fr.cosmicisland.game.SpawnManager;
 import net.minecraftforge.fml.loading.FMLPaths;
 
@@ -74,6 +75,7 @@ public final class KLFiles {
         RoleManager.load();
         TeamManager.load();
         SpawnManager.load();
+        RankingManager.load();
         GameRegistry.loadConfigs();
     }
 }
