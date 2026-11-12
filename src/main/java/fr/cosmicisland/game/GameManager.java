@@ -14,6 +14,8 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerBossEvent;
+import net.minecraft.world.BossEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -22,6 +24,8 @@ import net.minecraft.world.level.GameType;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,6 +51,10 @@ public final class GameManager {
 
     private static int ticks;
     private static int countdownValue;
+
+    private static boolean freezeActive = false;
+    private static final Map<UUID, double[]> anchors = new HashMap<>();
+    private static ServerBossEvent timerBar;
 
     private static final GameContext CONTEXT = new GameContext();
 
@@ -249,9 +257,21 @@ public final class GameManager {
         if (joined.isEmpty()) {
             return "Personne n'a rejoint l'épreuve pour l'instant.";
         }
+        try {
+            String refusal = game.canStart(CONTEXT);
+            if (refusal != null) {
+                return refusal;
+            }
+        } catch (Exception e) {
+            CosmicIsland.LOGGER.error("Erreur dans canStart du jeu {}", game.id(), e);
+            return "Erreur interne pendant la vérification du jeu (voir les logs).";
+        }
         state = State.COUNTDOWN;
         ticks = 0;
         countdownValue = Math.max(0, cfg.countdownSeconds);
+        if (cfg.freezeDuringCountdown) {
+            freezeActive = true;
+        }
         return null;
     }
 
@@ -281,6 +301,8 @@ public final class GameManager {
             InventoryStore.restore(server, p);
         }
 
+        unfreeze();
+        removeTimerBar();
         String name = c.displayName;
         state = State.IDLE;
         game = null;
@@ -311,6 +333,10 @@ public final class GameManager {
             default -> { }
         }
 
+        if (freezeActive && state != State.IDLE && state != State.RUNNING) {
+            applyFreeze();
+        }
+
         // Faim : si le flag est a false, on garde les joueurs rassasies
         if (cfg != null && state != State.IDLE && !cfg.flags.hunger && server.getTickCount() % 20 == 0) {
             for (ServerPlayer p : onlineParticipants()) {
@@ -331,9 +357,10 @@ public final class GameManager {
                 countdownValue--;
             } else {
                 for (ServerPlayer p : onlineParticipants()) {
-                    GameMessages.send(cfg, "start", p);
+                    GameMessages.sendWithTitleTimes(cfg, "start", p, 0, cfg.goTitleStayTicks, 5);
                     GameMessages.playSound(p, cfg.goSound, 2.0f);
                 }
+                unfreeze();
                 startRunning();
                 return;
             }
@@ -344,6 +371,7 @@ public final class GameManager {
     private static void startRunning() {
         state = State.RUNNING;
         ticks = 0;
+        updateTimerBar();
         try {
             game.onStart(CONTEXT);
         } catch (Exception e) {
@@ -364,6 +392,9 @@ public final class GameManager {
             return; // le jeu s'est termine lui-meme via ctx.end()
         }
         ticks++;
+        if (cfg.showTimer && ticks % 20 == 0) {
+            updateTimerBar();
+        }
         if (cfg.reminderSeconds > 0 && ticks % (cfg.reminderSeconds * 20) == 0) {
             for (ServerPlayer p : onlineParticipants()) {
                 GameMessages.send(cfg, "reminder", p);
@@ -371,6 +402,67 @@ public final class GameManager {
         }
         if (cfg.durationSeconds > 0 && ticks >= cfg.durationSeconds * 20) {
             finish(false);
+        }
+    }
+
+    // ------------------------------------------------------------ freeze
+
+    /** Immobilise les participants (utile avant /kl go pour un depart simultane). */
+    public static String freeze() {
+        if (state == State.IDLE) {
+            return "Aucune épreuve en cours.";
+        }
+        if (state == State.RUNNING) {
+            return "L'épreuve a déjà démarré.";
+        }
+        freezeActive = true;
+        notifyStaff("Participants &bimmobilisés&7. Ils seront libérés au GO du &f/kl go&7 (ou avec &f/kl unfreeze&7).");
+        return null;
+    }
+
+    public static void unfreeze() {
+        freezeActive = false;
+        anchors.clear();
+    }
+
+    private static void applyFreeze() {
+        for (ServerPlayer p : onlineParticipants()) {
+            double[] a = anchors.computeIfAbsent(p.getUUID(), k -> new double[] {p.getX(), p.getY(), p.getZ()});
+            double dx = p.getX() - a[0];
+            double dz = p.getZ() - a[2];
+            double dy = p.getY() - a[1];
+            if (dx * dx + dz * dz > 0.0004 || dy > 0.01) {
+                p.connection.teleport(a[0], a[1], a[2], p.getYRot(), p.getXRot());
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ timer
+
+    private static void updateTimerBar() {
+        if (cfg == null || !cfg.showTimer) {
+            return;
+        }
+        boolean limited = cfg.durationSeconds > 0;
+        int elapsed = ticks / 20;
+        int shown = limited ? Math.max(0, cfg.durationSeconds - elapsed) : elapsed;
+        String time = String.format("%02d:%02d", shown / 60, shown % 60);
+        String label = limited ? cfg.timerLabelRemaining : cfg.timerLabelElapsed;
+        if (timerBar == null) {
+            timerBar = new ServerBossEvent(Component.empty(), BossEvent.BossBarColor.YELLOW,
+                    BossEvent.BossBarOverlay.PROGRESS);
+        }
+        timerBar.setName(Txt.of(label.replace("{time}", time)));
+        timerBar.setProgress(limited ? Math.max(0.0f, Math.min(1.0f, (float) shown / cfg.durationSeconds)) : 1.0f);
+        for (ServerPlayer p : onlineParticipants()) {
+            timerBar.addPlayer(p);
+        }
+    }
+
+    private static void removeTimerBar() {
+        if (timerBar != null) {
+            timerBar.removeAllPlayers();
+            timerBar = null;
         }
     }
 

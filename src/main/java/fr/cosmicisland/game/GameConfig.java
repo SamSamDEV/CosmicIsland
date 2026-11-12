@@ -30,6 +30,7 @@ public class GameConfig {
         public boolean hunger = false;
         public boolean damage = false;
         public boolean dropItems = false;
+        public boolean pickupItems = false;
         public boolean interact = false;
         public boolean mobs = false;
     }
@@ -40,6 +41,9 @@ public class GameConfig {
         public String subtitle = "";
         public String channel = "chat"; // chat, title, actionbar (combinables : "chat+title")
         public String sound = "";
+        public int fadeIn = 10;  // duree du titre en ticks (20 = 1 seconde)
+        public int stay = 50;
+        public int fadeOut = 10;
 
         public Msg() {}
 
@@ -53,11 +57,15 @@ public class GameConfig {
     public String displayName = "";
     public int inviteSeconds = 60;
     public int countdownSeconds = 3;
-    public int durationSeconds = 0;  // 0 = pas de limite de temps
+    public int durationSeconds = -1; // duree max en secondes ; -1 = temps infini
     public int reminderSeconds = 0;  // 0 = pas de rappel
     public List<String> allowedTeams = new ArrayList<>(List.of("rouge", "jaune", "blanche"));
     public String gameMode = "survival";
     public boolean clearInventoryOnJoin = true;
+    public boolean freezeDuringCountdown = true; // joueurs immobilises pendant le decompte
+    public boolean showTimer = true;             // barre de temps (boss bar) pendant l'epreuve
+    public String timerLabelRemaining = "&e&lTemps restant : &f{time}";
+    public String timerLabelElapsed = "&e&lTemps écoulé : &f{time}";
     public List<KitItem> kit = new ArrayList<>();
     public Flags flags = new Flags();
 
@@ -66,6 +74,7 @@ public class GameConfig {
     public String countdownFormat = "&6&l{n}";
     public String countdownSound = "minecraft:block.dispenser.dispense";
     public String goSound = "minecraft:block.note_block.pling";
+    public int goTitleStayTicks = 15; // duree d'affichage du GO en ticks (20 = 1 seconde)
 
     public Map<String, Msg> messages = defaultMessages();
 

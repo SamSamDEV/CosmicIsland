@@ -6,6 +6,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.item.ItemTossEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
@@ -81,6 +82,14 @@ public class GameEvents {
             event.setCanceled(true);
             // On rend l'objet au joueur pour ne rien perdre
             event.getPlayer().getInventory().add(event.getEntity().getItem());
+        }
+    }
+
+    @SubscribeEvent
+    public void onPickup(EntityItemPickupEvent event) {
+        GameConfig.Flags f = flags(event.getEntity());
+        if (f != null && !f.pickupItems) {
+            event.setCanceled(true);
         }
     }
 

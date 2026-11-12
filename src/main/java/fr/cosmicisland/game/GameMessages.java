@@ -3,6 +3,7 @@ package fr.cosmicisland.game;
 import fr.cosmicisland.TeamManager;
 import fr.cosmicisland.Txt;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundClearTitlesPacket;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
@@ -33,11 +34,27 @@ public final class GameMessages {
 
     /** Envoie le message "key" de la config a un joueur. Ne fait rien si le message est vide ou absent. */
     public static void send(GameConfig cfg, String key, ServerPlayer player) {
+        sendInternal(cfg, key, player, player, -1, -1, -1);
+    }
+
+    /** Envoie le message a "player" en remplacant {joueur} et {equipe} par ceux de "subject". */
+    public static void send(GameConfig cfg, String key, ServerPlayer player, ServerPlayer subject) {
+        sendInternal(cfg, key, player, subject, -1, -1, -1);
+    }
+
+    /** Comme send, mais impose la duree du titre (en ticks) au lieu de celle du message. */
+    public static void sendWithTitleTimes(GameConfig cfg, String key, ServerPlayer player,
+                                          int fadeIn, int stay, int fadeOut) {
+        sendInternal(cfg, key, player, player, fadeIn, stay, fadeOut);
+    }
+
+    private static void sendInternal(GameConfig cfg, String key, ServerPlayer player, ServerPlayer subject,
+                                     int fadeIn, int stay, int fadeOut) {
         GameConfig.Msg msg = cfg.message(key);
         if (msg == null || msg.text == null || msg.text.isEmpty()) {
             return;
         }
-        Component text = Txt.of(apply(msg.text, player, cfg));
+        Component text = Txt.of(apply(msg.text, subject, cfg));
         String channels = msg.channel == null ? "chat" : msg.channel;
         for (String channel : channels.split("\\+")) {
             switch (channel.trim().toLowerCase()) {
@@ -46,8 +63,11 @@ public final class GameMessages {
                 case "title" -> {
                     Component sub = (msg.subtitle == null || msg.subtitle.isEmpty())
                             ? Component.empty()
-                            : Txt.of(apply(msg.subtitle, player, cfg));
-                    showTitle(player, text, sub, 10, 50, 10);
+                            : Txt.of(apply(msg.subtitle, subject, cfg));
+                    showTitle(player, text, sub,
+                            fadeIn >= 0 ? fadeIn : msg.fadeIn,
+                            stay >= 0 ? stay : msg.stay,
+                            fadeOut >= 0 ? fadeOut : msg.fadeOut);
                 }
                 default -> { }
             }
@@ -62,6 +82,11 @@ public final class GameMessages {
         player.connection.send(new ClientboundSetTitlesAnimationPacket(fadeIn, stay, fadeOut));
         player.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
         player.connection.send(new ClientboundSetTitleTextPacket(title));
+    }
+
+    /** Efface immediatement le titre affiche a l'ecran du joueur. */
+    public static void clearTitle(ServerPlayer player) {
+        player.connection.send(new ClientboundClearTitlesPacket(true));
     }
 
     public static void playSound(ServerPlayer player, String soundId, float pitch) {

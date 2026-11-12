@@ -6,6 +6,8 @@ import fr.cosmicisland.game.GameManager;
 import fr.cosmicisland.game.GameRegistry;
 import fr.cosmicisland.game.InventoryStore;
 import fr.cosmicisland.game.TestGame;
+import fr.cosmicisland.games.poteaux.PoteauxGame;
+import fr.cosmicisland.games.poteaux.PoteauxRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -15,6 +17,7 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
 @Mod(CosmicIsland.MODID)
@@ -25,8 +28,11 @@ public class CosmicIsland {
     public CosmicIsland() {
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new GameEvents());
+        // Blocs et reseau des poteaux (bus d'evenements du mod)
+        PoteauxRegistry.init(FMLJavaModLoadingContext.get().getModEventBus());
         // Jeux integres (les addons appellent GameRegistry.register de la meme facon)
         GameRegistry.register(new TestGame());
+        GameRegistry.register(PoteauxGame.INSTANCE);
     }
 
     @SubscribeEvent

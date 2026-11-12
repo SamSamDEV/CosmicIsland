@@ -1,5 +1,8 @@
 package fr.cosmicisland.game;
 
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.minecraft.commands.CommandSourceStack;
+
 /**
  * API d'un jeu Cosmic Island. Un jeu (integre ou venant d'un addon) implemente cette interface
  * puis s'enregistre avec GameRegistry.register(new MonJeu()).
@@ -25,4 +28,14 @@ public interface KLGame {
 
     /** Appele a la fin du jeu (cancelled = true si arrete par /kl stop). */
     default void onStop(GameContext ctx, boolean cancelled) {}
+
+    /** Appele par /kl go avant le decompte. Retourne un message d'erreur pour refuser le depart, ou null. */
+    default String canStart(GameContext ctx) {
+        return null;
+    }
+
+    /** Commandes propres au jeu, ajoutees sous /kl (ex. Commands.literal("poteaux")...). null = aucune. */
+    default LiteralArgumentBuilder<CommandSourceStack> commands() {
+        return null;
+    }
 }

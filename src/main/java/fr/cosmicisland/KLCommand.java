@@ -3,6 +3,7 @@ package fr.cosmicisland;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -18,6 +19,7 @@ import net.minecraft.server.level.ServerPlayer;
 import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.GameManager;
 import fr.cosmicisland.game.GameRegistry;
+import fr.cosmicisland.game.KLGame;
 import fr.cosmicisland.game.SpawnManager;
 
 import java.util.Arrays;
@@ -35,7 +37,7 @@ public final class KLCommand {
     private KLCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("kl")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("kl")
                 .then(Commands.literal("info")
                         .executes(KLCommand::info))
                 .then(Commands.literal("admin")
@@ -65,6 +67,12 @@ public final class KLCommand {
                 .then(Commands.literal("go")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .executes(KLCommand::gameGo))
+                .then(Commands.literal("freeze")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .executes(KLCommand::gameFreeze))
+                .then(Commands.literal("unfreeze")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .executes(KLCommand::gameUnfreeze))
                 .then(Commands.literal("stop")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .executes(c -> gameStop(c, null))
@@ -126,7 +134,17 @@ public final class KLCommand {
                                                 .executes(KLCommand::teamColor))))
                         .then(Commands.literal("merge")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                                .executes(KLCommand::teamMerge))));
+                                .executes(KLCommand::teamMerge)));
+
+        // Commandes propres a chaque jeu (ex. /kl poteaux ...)
+        for (String id : GameRegistry.ids()) {
+            KLGame game = GameRegistry.get(id);
+            LiteralArgumentBuilder<CommandSourceStack> node = game == null ? null : game.commands();
+            if (node != null) {
+                root.then(node);
+            }
+        }
+        dispatcher.register(root);
     }
 
     // ---------------------------------------------------------------- general
@@ -464,6 +482,21 @@ public final class KLCommand {
             Component row = line(e.getValue().name, value);
             src.sendSuccess(() -> row, false);
         }
+        return 1;
+    }
+
+    private static int gameFreeze(CommandContext<CommandSourceStack> ctx) {
+        String err = GameManager.freeze();
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int gameUnfreeze(CommandContext<CommandSourceStack> ctx) {
+        GameManager.unfreeze();
+        ctx.getSource().sendSuccess(() -> Component.literal("Participants libérés."), true);
         return 1;
     }
 }
