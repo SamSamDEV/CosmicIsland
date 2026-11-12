@@ -2,6 +2,8 @@ package fr.cosmicisland;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
@@ -26,6 +28,7 @@ public final class TeamManager {
         public String name = "";
         public String tag = "";
         public String color = "white";
+        public boolean bold = true; // tag en gras
         public Map<String, String> members = new LinkedHashMap<>(); // uuid -> pseudo
 
         public KLTeam() {}
@@ -148,7 +151,11 @@ public final class TeamManager {
                 pt = board.addPlayerTeam(boardName);
             }
             pt.setDisplayName(Txt.of(team.name));
-            pt.setPlayerPrefix(Txt.of(team.tag + " "));
+            MutableComponent prefix = Txt.of(team.tag);
+            if (team.bold) {
+                prefix.withStyle(ChatFormatting.BOLD);
+            }
+            pt.setPlayerPrefix(Component.empty().append(prefix).append(Component.literal(" ")));
             pt.setColor(team.format());
 
             Set<String> wanted = new HashSet<>(team.members.values());

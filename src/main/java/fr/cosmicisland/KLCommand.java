@@ -6,12 +6,14 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.ColorArgument;
 import net.minecraft.commands.arguments.GameProfileArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Arrays;
@@ -83,16 +85,56 @@ public final class KLCommand {
     // ---------------------------------------------------------------- general
 
     private static int info(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        CommandSourceStack src = ctx.getSource();
+        ServerPlayer player = src.getPlayerOrException();
+
+        // Staff : admin = rouge, organisateur = or, non = gris
         int level = KLPermissions.levelOf(player);
-        String staff = level == KLPermissions.ADMIN ? "admin"
-                : level == KLPermissions.ORGANISATEUR ? "organisateur" : "non";
-        String role = RoleManager.effective(player).id();
+        MutableComponent staff;
+        if (level == KLPermissions.ADMIN) {
+            staff = Component.literal("Admin").withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+        } else if (level == KLPermissions.ORGANISATEUR) {
+            staff = Component.literal("Organisateur").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+        } else {
+            staff = Component.literal("Non").withStyle(ChatFormatting.GRAY);
+        }
+
+        // Role : participant = vert, spectateur = cyan, organisateur = or
+        KLRole role = RoleManager.effective(player);
+        ChatFormatting roleColor = role == KLRole.PARTICIPANT ? ChatFormatting.GREEN
+                : role == KLRole.SPECTATEUR ? ChatFormatting.AQUA : ChatFormatting.GOLD;
+        MutableComponent roleValue = Component.literal(capitalize(role.id())).withStyle(roleColor);
+
+        // Equipe : tag en gras + nom, dans la couleur de l'equipe
         String teamId = TeamManager.teamIdOf(player.getUUID());
-        String team = teamId == null ? "aucune" : TeamManager.get(teamId).name;
-        ctx.getSource().sendSuccess(
-                () -> Component.literal("Staff : " + staff + " | Rôle : " + role + " | Équipe : " + team), false);
+        MutableComponent team;
+        if (teamId == null) {
+            team = Component.literal("Aucune").withStyle(ChatFormatting.GRAY);
+        } else {
+            TeamManager.KLTeam t = TeamManager.get(teamId);
+            team = Component.empty()
+                    .append(boldTag(t))
+                    .append(Component.literal(" " + t.name).withStyle(t.format()));
+        }
+
+        Component header = Component.literal("=== Cosmic Island ===")
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+        src.sendSuccess(() -> header, false);
+        src.sendSuccess(() -> line("Staff", staff), false);
+        src.sendSuccess(() -> line("Rôle", roleValue), false);
+        src.sendSuccess(() -> line("Équipe", team), false);
         return 1;
+    }
+
+    /** Une ligne "Libelle : valeur" avec le libelle en gras gris. */
+    private static Component line(String label, Component value) {
+        return Component.empty()
+                .append(Component.literal(label + " : ").withStyle(ChatFormatting.GRAY, ChatFormatting.BOLD))
+                .append(value);
+    }
+
+    private static String capitalize(String text) {
+        return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
     private static int admin(CommandContext<CommandSourceStack> ctx) {
@@ -160,12 +202,20 @@ public final class KLCommand {
         for (Map.Entry<String, TeamManager.KLTeam> e : TeamManager.all().entrySet()) {
             TeamManager.KLTeam t = e.getValue();
             Component line = Component.empty()
-                    .append(Txt.of(t.tag).withStyle(t.format()))
+                    .append(boldTag(t))
                     .append(Component.literal(" " + t.name + " (" + e.getKey() + ") - "
                             + t.members.size() + " joueur(s) : " + String.join(", ", t.members.values())));
             ctx.getSource().sendSuccess(() -> line, false);
         }
         return TeamManager.all().size();
+    }
+
+    private static Component boldTag(TeamManager.KLTeam t) {
+        var tag = Txt.of(t.tag).withStyle(t.format());
+        if (t.bold) {
+            tag.withStyle(ChatFormatting.BOLD);
+        }
+        return tag;
     }
 
     private static int teamAdd(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
