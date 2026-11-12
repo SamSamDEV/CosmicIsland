@@ -1,6 +1,7 @@
 package fr.cosmicisland.game;
 
 import fr.cosmicisland.CosmicIsland;
+import fr.cosmicisland.camp.CampfireManager;
 import fr.cosmicisland.KLPermissions;
 import fr.cosmicisland.KLRole;
 import fr.cosmicisland.RoleManager;
@@ -97,6 +98,16 @@ public final class GameManager {
         return state != State.IDLE && joined.contains(id);
     }
 
+    /** Identifiant du jeu en cours, ou null. */
+    public static String currentGameId() {
+        return game == null ? null : game.id();
+    }
+
+    /** Les participants sont-ils actuellement immobilises ? */
+    public static boolean isFrozen() {
+        return freezeActive;
+    }
+
     /** Flags de l'epreuve si le joueur y participe, sinon null (aucune restriction). */
     public static GameConfig.Flags flagsFor(ServerPlayer player) {
         if (cfg != null && isInGame(player.getUUID())) {
@@ -141,7 +152,7 @@ public final class GameManager {
             return "Le serveur n'est pas prêt.";
         }
         if (state != State.IDLE) {
-            return "Une épreuve est déjà en cours : " + describe() + " (utilise /kl stop pour l'arrêter).";
+            return "Une épreuve est déjà en cours : " + describe() + " (utilise /ccis stop pour l'arrêter).";
         }
         KLGame g = GameRegistry.get(gameId);
         GameConfig c = GameRegistry.config(gameId);
@@ -149,7 +160,7 @@ public final class GameManager {
             return "Jeu inconnu : " + gameId;
         }
         if (!c.enabled) {
-            return "Le jeu " + c.displayName + " est désactivé (/kl enable " + gameId + ").";
+            return "Le jeu " + c.displayName + " est désactivé (/ccis enable " + gameId + ").";
         }
 
         List<UUID> targets = new ArrayList<>();
@@ -162,7 +173,7 @@ public final class GameManager {
             if (team == null || !c.allowedTeams.contains(team)) {
                 continue;
             }
-            if (SpawnManager.get(team) == null) {
+            if (SpawnManager.zoneSpawn(g.id(), team) == null) {
                 missingSpawns.add(team);
             }
             targets.add(p.getUUID());
@@ -172,7 +183,7 @@ public final class GameManager {
         }
         if (!missingSpawns.isEmpty()) {
             return "Spawn manquant pour : " + String.join(", ", missingSpawns)
-                    + " (utilise /kl spawn set <équipe> à l'endroit voulu).";
+                    + " (utilise /ccis spawn set <équipe> à l'endroit voulu).";
         }
 
         game = g;
@@ -192,7 +203,7 @@ public final class GameManager {
             }
         }
         notifyStaff("Invitations envoyées à &f" + targets.size() + "&7 joueur(s) pour &f" + c.displayName
-                + "&7. Lance le départ avec &f/kl go&7 quand tout le monde est prêt.");
+                + "&7. Lance le départ avec &f/ccis go&7 quand tout le monde est prêt.");
         return null;
     }
 
@@ -209,7 +220,7 @@ public final class GameManager {
             return "Tu as déjà rejoint l'épreuve.";
         }
         String team = TeamManager.teamIdOf(id);
-        SpawnManager.Spawn spawn = team == null ? null : SpawnManager.get(team);
+        SpawnManager.Spawn spawn = team == null ? null : SpawnManager.zoneSpawn(game.id(), team);
         if (spawn == null) {
             return "Ton équipe n'a pas de point de spawn : préviens un organisateur.";
         }
@@ -256,7 +267,7 @@ public final class GameManager {
     /** Lance le decompte. Retourne un message d'erreur, ou null. */
     public static String go() {
         if (state != State.INVITE && state != State.READY) {
-            return "Aucune épreuve prête à démarrer (utilise /kl start <jeu>).";
+            return "Aucune épreuve prête à démarrer (utilise /ccis start <jeu>).";
         }
         if (joined.isEmpty()) {
             return "Personne n'a rejoint l'épreuve pour l'instant.";
@@ -310,7 +321,15 @@ public final class GameManager {
                 continue; // restaure automatiquement a la prochaine connexion
             }
             GameMessages.send(c, cancelled ? "stop" : "end", p);
-            InventoryStore.restore(server, p);
+            CampfireManager.clearDebuff(p);
+            // Fin d'epreuve : retour au point d'equipe de la zone de jeu (le joueur rentre ensuite avec /ccis base)
+            String teamId = TeamManager.teamIdOf(id);
+            SpawnManager.Spawn endSpawn = (c.endAtTeamSpawn && teamId != null)
+                    ? SpawnManager.zoneSpawn(g.id(), teamId) : null;
+            InventoryStore.restore(server, p, endSpawn == null);
+            if (endSpawn != null) {
+                SpawnManager.teleport(server, p, endSpawn);
+            }
         }
 
         if (wasRunning) {
@@ -341,7 +360,7 @@ public final class GameManager {
                 if (ticks <= 0) {
                     state = State.READY;
                     notifyStaff("Invitations terminées : &a" + joined.size() + "&7/&f" + invited.size()
-                            + "&7 ont rejoint. Utilise &f/kl go&7 pour lancer le décompte.");
+                            + "&7 ont rejoint. Utilise &f/ccis go&7 pour lancer le décompte.");
                 }
             }
             case COUNTDOWN -> tickCountdown();
@@ -411,6 +430,11 @@ public final class GameManager {
         if (cfg.showTimer && ticks % 20 == 0) {
             updateTimerBar();
         }
+        if (cfg.campfireDebuff && ticks % 20 == 0) {
+            for (ServerPlayer p : onlineParticipants()) {
+                CampfireManager.applyDebuff(p);
+            }
+        }
         if (cfg.reminderSeconds > 0 && ticks % (cfg.reminderSeconds * 20) == 0) {
             for (ServerPlayer p : onlineParticipants()) {
                 GameMessages.send(cfg, "reminder", p);
@@ -423,7 +447,7 @@ public final class GameManager {
 
     // ------------------------------------------------------------ freeze
 
-    /** Immobilise les participants (utile avant /kl go pour un depart simultane). */
+    /** Immobilise les participants (utile avant /ccis go pour un depart simultane). */
     public static String freeze() {
         if (state == State.IDLE) {
             return "Aucune épreuve en cours.";
@@ -432,7 +456,7 @@ public final class GameManager {
             return "L'épreuve a déjà démarré.";
         }
         freezeActive = true;
-        notifyStaff("Participants &bimmobilisés&7. Ils seront libérés au GO du &f/kl go&7 (ou avec &f/kl unfreeze&7).");
+        notifyStaff("Participants &bimmobilisés&7. Ils seront libérés au GO du &f/ccis go&7 (ou avec &f/ccis unfreeze&7).");
         return null;
     }
 
@@ -487,16 +511,16 @@ public final class GameManager {
     private static void checkAllAnswered() {
         if (joined.size() + declined.size() >= invited.size()) {
             notifyStaff("Tous les joueurs ont répondu : &a" + joined.size()
-                    + "&7 participant(s). Utilise &f/kl go&7 pour lancer le décompte.");
+                    + "&7 participant(s). Utilise &f/ccis go&7 pour lancer le décompte.");
         }
     }
 
     private static void sendInvite(ServerPlayer player) {
         GameMessages.send(cfg, "invite", player);
         MutableComponent buttons = Component.empty()
-                .append(button(cfg.buttonJoin, ChatFormatting.GREEN, "/kl join", "Clique pour rejoindre l'épreuve"))
+                .append(button(cfg.buttonJoin, ChatFormatting.GREEN, "/ccis join", "Clique pour rejoindre l'épreuve"))
                 .append(Component.literal("   "))
-                .append(button(cfg.buttonDecline, ChatFormatting.RED, "/kl decline", "Clique pour ne pas participer"));
+                .append(button(cfg.buttonDecline, ChatFormatting.RED, "/ccis decline", "Clique pour ne pas participer"));
         player.sendSystemMessage(buttons);
     }
 

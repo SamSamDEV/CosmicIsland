@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import fr.cosmicisland.KLPermissions;
 import fr.cosmicisland.TeamManager;
+import fr.cosmicisland.camp.CampfireManager;
 import fr.cosmicisland.Txt;
 import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.GameContext;
@@ -57,6 +58,7 @@ public class PoteauxGame implements KLGame {
         boolean answered = false;
         boolean falling = false;
         int fallTicks = 0;
+        int deadline = 0; // dernier tick ou la reponse est acceptee pour la fleche en cours
 
         Contestant(UUID id, String name, String group) {
             this.id = id;
@@ -116,6 +118,8 @@ public class PoteauxGame implements KLGame {
         s.addProperty("firstDelayMs", 1500);  // delai avant la premiere fleche
         s.addProperty("pushStrength", 0.3);   // poussee vers l'avant (distance en blocs ~ 7 x valeur)
         s.addProperty("pushUp", 0.3);         // petit saut vers le haut pendant la poussee
+        s.addProperty("campfireWindowMultiplier", 0.75); // feu de camp eteint : temps pour appuyer x 0.75
+        s.addProperty("campfireErrorWeight", 2);         // feu de camp eteint : chaque erreur compte double
         s.addProperty("fallTimeoutTicks", 80); // elimination de secours si le joueur ne touche pas l'eau
         c.messages.put("fall", new GameConfig.Msg("&c&lTu perds l'équilibre !", "actionbar"));
         GameConfig.Msg eliminated = new GameConfig.Msg("&c&lÉLIMINÉ", "title");
@@ -129,8 +133,8 @@ public class PoteauxGame implements KLGame {
     public String canStart(GameContext ctx) {
         GameConfig cfg = ctx.config();
         if (readZone(cfg) == null) {
-            return "Zone non définie : place-toi à un coin de la zone d'eau et tape /kl poteaux zone pos1, "
-                    + "puis à l'autre coin opposé et tape /kl poteaux zone pos2.";
+            return "Zone non définie : place-toi à un coin de la zone d'eau et tape /ccis poteaux zone pos1, "
+                    + "puis à l'autre coin opposé et tape /ccis poteaux zone pos2.";
         }
         List<String> missing = new ArrayList<>();
         List<String> duplicates = new ArrayList<>();
@@ -317,18 +321,22 @@ public class PoteauxGame implements KLGame {
         arrowsShown++;
         arrowActive = true;
         int grace = Math.max(0, (int) Math.ceil(num(cfg, "graceMs", 150) / 50.0));
-        arrowResolveTick = tickCounter + ticks(windowMs) + grace;
+        int maxDeadline = tickCounter + ticks(windowMs) + grace;
         for (Contestant c : contestants.values()) {
             if (!c.alive || c.falling) {
                 continue;
             }
             c.answered = false;
+            int win = windowFor(cfg, c);
+            c.deadline = tickCounter + ticks(win) + grace;
+            maxDeadline = Math.max(maxDeadline, c.deadline);
             ServerPlayer p = online(c);
             if (p != null) {
                 GameMessages.clearTitle(p); // evite que le GO ou un titre cache la fleche
-                PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(arrowDir, windowMs));
+                PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(arrowDir, win));
             }
         }
+        arrowResolveTick = maxDeadline;
     }
 
     private void resolveArrow(GameConfig cfg) {
@@ -365,7 +373,7 @@ public class PoteauxGame implements KLGame {
             return;
         }
         c.answered = true;
-        if (dir == arrowDir && tickCounter <= arrowResolveTick) {
+        if (dir == arrowDir && tickCounter <= c.deadline) {
             GameMessages.playSound(player, "minecraft:block.note_block.pling", 1.6f);
             sendState(player, true, c.errors, 1);
         } else {
@@ -374,7 +382,7 @@ public class PoteauxGame implements KLGame {
     }
 
     private void fail(GameConfig cfg, Contestant c, ServerPlayer p) {
-        c.errors++;
+        c.errors += errorWeight(cfg, c);
         if (p == null) {
             c.alive = false; // joueur deconnecte
             eliminations.add(new Elimination(c.id, c.name, tickCounter / 20.0, "déconnecté", c.errors));
@@ -416,7 +424,7 @@ public class PoteauxGame implements KLGame {
         }
         // Retour au spawn de l'equipe
         String team = TeamManager.teamIdOf(p.getUUID());
-        SpawnManager.Spawn spawn = team == null ? null : SpawnManager.get(team);
+        SpawnManager.Spawn spawn = team == null ? null : SpawnManager.zoneSpawn(ID, team);
         p.fallDistance = 0.0f;
         if (spawn != null && GameManager.server() != null) {
             SpawnManager.teleport(GameManager.server(), p, spawn);
@@ -428,7 +436,7 @@ public class PoteauxGame implements KLGame {
 
     private void checkEnd(GameContext ctx) {
         if (initialGroups <= 1) {
-            return; // un seul groupe au depart (test en solo) : fin par le timer ou /kl stop
+            return; // un seul groupe au depart (test en solo) : fin par le timer ou /ccis stop
         }
         Set<String> aliveGroups = new HashSet<>();
         for (Contestant c : contestants.values()) {
@@ -462,6 +470,24 @@ public class PoteauxGame implements KLGame {
     }
 
     // ------------------------------------------------------------ utilitaires
+
+    /** Feu de camp eteint : le malus de difficulte s'applique-t-il a ce joueur ? */
+    private static boolean fireOut(GameConfig cfg, Contestant c) {
+        return cfg.campfireDebuff && CampfireManager.isOut(TeamManager.teamIdOf(c.id));
+    }
+
+    /** Temps (ms) pour repondre : reduit si le feu de camp de l'equipe est eteint. */
+    private int windowFor(GameConfig cfg, Contestant c) {
+        if (!fireOut(cfg, c)) {
+            return windowMs;
+        }
+        return Math.max(150, (int) Math.round(windowMs * dbl(cfg, "campfireWindowMultiplier", 0.75)));
+    }
+
+    /** Poids d'une erreur : plus lourd si le feu de camp de l'equipe est eteint. */
+    private static int errorWeight(GameConfig cfg, Contestant c) {
+        return fireOut(cfg, c) ? Math.max(1, num(cfg, "campfireErrorWeight", 2)) : 1;
+    }
 
     private static ServerPlayer online(Contestant c) {
         if (GameManager.server() == null) {
@@ -571,7 +597,7 @@ public class PoteauxGame implements KLGame {
         }
     }
 
-    // ------------------------------------------------------------ commandes : /kl poteaux ...
+    // ------------------------------------------------------------ commandes : /ccis poteaux ...
 
     @Override
     public LiteralArgumentBuilder<CommandSourceStack> commands() {
@@ -612,12 +638,12 @@ public class PoteauxGame implements KLGame {
         return 1;
     }
 
-    /** Indique qui est sur un poteau parmi les participants (a utiliser avant /kl go). */
+    /** Indique qui est sur un poteau parmi les participants (a utiliser avant /ccis go). */
     private int check(CommandContext<CommandSourceStack> ctx) {
         List<ServerPlayer> list = GameManager.onlineParticipants();
         if (list.isEmpty()) {
             ctx.getSource().sendFailure(Component.literal(
-                    "Aucun participant : lance /kl start poteaux et attends que les joueurs rejoignent."));
+                    "Aucun participant : lance /ccis start poteaux et attends que les joueurs rejoignent."));
             return 0;
         }
         for (ServerPlayer p : list) {

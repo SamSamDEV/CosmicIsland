@@ -61,6 +61,11 @@ public final class InventoryStore {
 
     /** Restaure inventaire, position et mode de jeu, puis supprime la sauvegarde. */
     public static boolean restore(MinecraftServer server, ServerPlayer player) {
+        return restore(server, player, true);
+    }
+
+    /** teleportBack = false : le joueur n'est pas ramene a sa position d'origine (il sera place ailleurs). */
+    public static boolean restore(MinecraftServer server, ServerPlayer player, boolean teleportBack) {
         Path path = file(player.getUUID());
         if (!Files.exists(path)) {
             return false;
@@ -78,7 +83,7 @@ public final class InventoryStore {
         player.inventoryMenu.broadcastChanges();
 
         ServerLevel level = SpawnManager.level(server, tag.getString("dimension"));
-        if (level != null) {
+        if (teleportBack && level != null) {
             player.teleportTo(level, tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"),
                     tag.getFloat("yRot"), tag.getFloat("xRot"));
         }

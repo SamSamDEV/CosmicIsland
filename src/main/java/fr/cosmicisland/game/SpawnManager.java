@@ -72,4 +72,27 @@ public final class SpawnManager {
         player.teleportTo(level, spawn.x, spawn.y, spawn.z, spawn.yaw, spawn.pitch);
         return true;
     }
+
+    /** Emplacements qui ne sont pas des equipes : le conseil et le point d'elimination. */
+    public static boolean isSpecial(String id) {
+        return id.equals("conseil") || id.equals("elimination");
+    }
+
+    /** Point d'equipe sur la zone de jeu : celui propre au jeu s'il existe, sinon celui de l'equipe. */
+    public static Spawn zoneSpawn(String gameId, String teamId) {
+        Spawn s = get("zone:" + gameId + ":" + teamId);
+        return s != null ? s : get(teamId);
+    }
+
+    /** Base (camp) de l'equipe ; a defaut le point d'equipe de la zone de jeu. */
+    public static Spawn baseSpawn(String teamId) {
+        Spawn s = get("base:" + teamId);
+        return s != null ? s : get(teamId);
+    }
+
+    /** Point de respawn apres une mort ; a defaut la base. */
+    public static Spawn respawnSpawn(String teamId) {
+        Spawn s = get("respawn:" + teamId);
+        return s != null ? s : baseSpawn(teamId);
+    }
 }

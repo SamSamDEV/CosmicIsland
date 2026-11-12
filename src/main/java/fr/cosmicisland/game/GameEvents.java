@@ -1,12 +1,16 @@
 package fr.cosmicisland.game;
 
+import fr.cosmicisland.camp.CampfireManager;
+import fr.cosmicisland.conseil.ConseilManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.item.ItemTossEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import fr.cosmicisland.TeamManager;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
@@ -30,6 +34,8 @@ public class GameEvents {
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             GameManager.tick();
+            ConseilManager.tick();
+            CampfireManager.tick();
         }
     }
 
@@ -118,6 +124,27 @@ public class GameEvents {
             if (f != null && !f.mobs) {
                 event.setNewTarget(null);
             }
+        }
+    }
+
+    /** Mort : le joueur reapparait au respawn de son equipe (ou au point d'equipe de la zone s'il est en epreuve). */
+    @SubscribeEvent
+    public void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.isEndConquered()) {
+            return;
+        }
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+        String team = TeamManager.teamIdOf(player.getUUID());
+        if (team == null || player.getServer() == null) {
+            return;
+        }
+        SpawnManager.Spawn target = GameManager.isInGame(player.getUUID())
+                ? SpawnManager.zoneSpawn(GameManager.currentGameId(), team)
+                : SpawnManager.respawnSpawn(team);
+        if (target != null) {
+            SpawnManager.teleport(player.getServer(), player, target);
         }
     }
 }

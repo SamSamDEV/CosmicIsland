@@ -1,6 +1,11 @@
 package fr.cosmicisland;
 
 import com.mojang.logging.LogUtils;
+import fr.cosmicisland.camp.CampfireEvents;
+import fr.cosmicisland.camp.CampfireManager;
+import fr.cosmicisland.chat.ChatEvents;
+import fr.cosmicisland.conseil.ConseilManager;
+import fr.cosmicisland.conseil.ConseilRegistry;
 import fr.cosmicisland.game.GameEvents;
 import fr.cosmicisland.game.GameManager;
 import fr.cosmicisland.game.GameRegistry;
@@ -28,8 +33,11 @@ public class CosmicIsland {
     public CosmicIsland() {
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new GameEvents());
+        MinecraftForge.EVENT_BUS.register(new ChatEvents());
+        MinecraftForge.EVENT_BUS.register(new CampfireEvents());
         // Blocs et reseau des poteaux (bus d'evenements du mod)
         PoteauxRegistry.init(FMLJavaModLoadingContext.get().getModEventBus());
+        ConseilRegistry.init(FMLJavaModLoadingContext.get().getModEventBus());
         // Jeux integres (les addons appellent GameRegistry.register de la meme facon)
         GameRegistry.register(new TestGame());
         GameRegistry.register(PoteauxGame.INSTANCE);
@@ -51,11 +59,15 @@ public class CosmicIsland {
     public void onServerStarted(ServerStartedEvent event) {
         TeamManager.sync(event.getServer());
         GameManager.init(event.getServer());
+        ConseilManager.init(event.getServer());
+        CampfireManager.init(event.getServer());
     }
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         GameManager.shutdown();
+        ConseilManager.shutdown();
+        CampfireManager.shutdown();
     }
 
     @SubscribeEvent

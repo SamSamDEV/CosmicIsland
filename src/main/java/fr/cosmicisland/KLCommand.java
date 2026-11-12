@@ -2,6 +2,7 @@ package fr.cosmicisland;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -17,6 +18,13 @@ import net.minecraft.commands.arguments.GameProfileArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import fr.cosmicisland.camp.CampfireManager;
+import fr.cosmicisland.conseil.ConseilAdminMenu;
+import fr.cosmicisland.conseil.ConseilManager;
+import fr.cosmicisland.conseil.ConseilMenus;
 import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.GameManager;
 import fr.cosmicisland.game.GameRegistry;
@@ -42,9 +50,41 @@ public final class KLCommand {
     private KLCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("kl")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("ccis")
                 .then(Commands.literal("info")
                         .executes(KLCommand::info))
+                .then(Commands.literal("help")
+                        .executes(KLCommand::help))
+                .then(Commands.literal("base")
+                        .executes(KLCommand::goBase))
+                .then(Commands.literal("campfire")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .then(Commands.literal("status")
+                                .executes(KLCommand::campfireStatus))
+                        .then(Commands.literal("tp")
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(KLCommand::campfireTp)))
+                        .then(Commands.literal("set")
+                                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(KLCommand::campfireSet)))
+                        .then(Commands.literal("remove")
+                                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(KLCommand::campfireRemove)))
+                        .then(Commands.literal("fuel")
+                                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .then(Commands.argument("valeur", DoubleArgumentType.doubleArg(0.0, 100000.0))
+                                                .executes(KLCommand::campfireFuel)))))
+                .then(Commands.literal("say")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .then(Commands.argument("texte", StringArgumentType.greedyString())
+                                .executes(KLCommand::say)))
                 .then(Commands.literal("admin")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .executes(KLCommand::admin))
@@ -92,12 +132,36 @@ public final class KLCommand {
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .then(Commands.literal("set")
                                 .then(Commands.argument("equipe", StringArgumentType.word())
-                                        .suggests(TEAM_IDS)
+                                        .suggests(SPAWN_IDS)
                                         .executes(KLCommand::spawnSet)))
                         .then(Commands.literal("tp")
                                 .then(Commands.argument("equipe", StringArgumentType.word())
-                                        .suggests(TEAM_IDS)
+                                        .suggests(SPAWN_IDS)
                                         .executes(KLCommand::spawnTp)))
+                        .then(Commands.literal("base")
+                                .then(Commands.literal("set")
+                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                                .suggests(TEAM_IDS)
+                                                .executes(c -> teamSpawnSet(c, "base:"))))
+                                .then(Commands.literal("tp")
+                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                                .suggests(TEAM_IDS)
+                                                .executes(c -> teamSpawnTp(c, "base:")))))
+                        .then(Commands.literal("respawn")
+                                .then(Commands.literal("set")
+                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                                .suggests(TEAM_IDS)
+                                                .executes(c -> teamSpawnSet(c, "respawn:"))))
+                                .then(Commands.literal("tp")
+                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                                .suggests(TEAM_IDS)
+                                                .executes(c -> teamSpawnTp(c, "respawn:")))))
+                        .then(Commands.literal("jeu")
+                                .then(Commands.argument("jeu", StringArgumentType.word())
+                                        .suggests(GAME_IDS)
+                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                                .suggests(TEAM_IDS)
+                                                .executes(KLCommand::gameZoneSet))))
                         .then(Commands.literal("list")
                                 .executes(KLCommand::spawnList)))
                 .then(Commands.literal("ranking")
@@ -127,6 +191,38 @@ public final class KLCommand {
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .then(Commands.argument("texte", StringArgumentType.greedyString())
                                 .executes(KLCommand::placeholderTest)))
+                .then(Commands.literal("vote")
+                        .executes(KLCommand::conseilVote))
+                .then(Commands.literal("conseil")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .then(Commands.literal("start")
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(KLCommand::conseilStart)))
+                        .then(Commands.literal("test")
+                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .suggests(TEAM_IDS)
+                                        .executes(c -> conseilTest(c, 3))
+                                        .then(Commands.argument("nombre", IntegerArgumentType.integer(1, 20))
+                                                .executes(c -> conseilTest(c, IntegerArgumentType.getInteger(c, "nombre"))))))
+                        .then(Commands.literal("menu")
+                                .executes(KLCommand::conseilMenu))
+                        .then(Commands.literal("status")
+                                .executes(KLCommand::conseilStatus))
+                        .then(Commands.literal("vote")
+                                .then(Commands.literal("close")
+                                        .executes(c -> conseilAction(c, "voteclose"))))
+                        .then(Commands.literal("reveal")
+                                .executes(c -> conseilAction(c, "reveal")))
+                        .then(Commands.literal("revote")
+                                .executes(c -> conseilAction(c, "revote")))
+                        .then(Commands.literal("close")
+                                .executes(c -> conseilAction(c, "close")))
+                        .then(Commands.literal("cancel")
+                                .executes(c -> conseilAction(c, "cancel")))
+                        .then(Commands.literal("immunite")
+                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                        .executes(KLCommand::conseilImmunity))))
                 .then(Commands.literal("role")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .then(Commands.literal("set")
@@ -168,7 +264,7 @@ public final class KLCommand {
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                                 .executes(KLCommand::teamMerge)));
 
-        // Commandes propres a chaque jeu (ex. /kl poteaux ...)
+        // Commandes propres a chaque jeu (ex. /ccis poteaux ...)
         for (String id : GameRegistry.ids()) {
             KLGame game = GameRegistry.get(id);
             LiteralArgumentBuilder<CommandSourceStack> node = game == null ? null : game.commands();
@@ -177,6 +273,8 @@ public final class KLCommand {
             }
         }
         dispatcher.register(root);
+        // Alias court : /base = /ccis base
+        dispatcher.register(Commands.literal("base").executes(KLCommand::goBase));
     }
 
     // ---------------------------------------------------------------- general
@@ -234,10 +332,8 @@ public final class KLCommand {
         return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
-    private static int admin(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(
-                () -> Component.literal("Menu admin : arrive à la phase 3 (interface). Ton accès staff est bien validé."),
-                false);
+    private static int admin(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        fr.cosmicisland.gui.AdminMenus.openMain(ctx.getSource().getPlayerOrException());
         return 1;
     }
 
@@ -473,25 +569,32 @@ public final class KLCommand {
 
     private static int spawnSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        TeamManager.KLTeam team = findTeam(ctx);
-        if (team == null) {
-            return 0;
+        String id = StringArgumentType.getString(ctx, "equipe").toLowerCase();
+        String label;
+        if (SpawnManager.isSpecial(id)) {
+            label = id;
+        } else {
+            TeamManager.KLTeam team = findTeam(ctx);
+            if (team == null) {
+                return 0;
+            }
+            label = "de l'équipe " + team.name;
         }
-        SpawnManager.set(StringArgumentType.getString(ctx, "equipe"), player);
-        String msg = "Spawn de l'équipe " + team.name + " défini à ta position.";
+        SpawnManager.set(id, player);
+        String msg = "Spawn " + label + " défini à ta position.";
         ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
         return 1;
     }
 
     private static int spawnTp(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        TeamManager.KLTeam team = findTeam(ctx);
-        if (team == null) {
+        String id = StringArgumentType.getString(ctx, "equipe").toLowerCase();
+        if (!SpawnManager.isSpecial(id) && findTeam(ctx) == null) {
             return 0;
         }
-        SpawnManager.Spawn spawn = SpawnManager.get(StringArgumentType.getString(ctx, "equipe"));
+        SpawnManager.Spawn spawn = SpawnManager.get(id);
         if (spawn == null) {
-            ctx.getSource().sendFailure(Component.literal("Spawn non défini pour l'équipe " + team.name + "."));
+            ctx.getSource().sendFailure(Component.literal("Spawn non défini : " + id));
             return 0;
         }
         if (!SpawnManager.teleport(ctx.getSource().getServer(), player, spawn)) {
@@ -503,18 +606,28 @@ public final class KLCommand {
 
     private static int spawnList(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack src = ctx.getSource();
-        src.sendSuccess(() -> Component.literal("=== Spawns d'équipe ===")
+        src.sendSuccess(() -> Component.literal("=== Spawns ===")
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
         for (Map.Entry<String, TeamManager.KLTeam> e : TeamManager.all().entrySet()) {
-            SpawnManager.Spawn s = SpawnManager.get(e.getKey());
-            Component value = s == null
-                    ? Component.literal("non défini").withStyle(ChatFormatting.RED)
-                    : Component.literal(String.format("%s  %.1f %.1f %.1f", s.dimension, s.x, s.y, s.z))
-                            .withStyle(ChatFormatting.GREEN);
-            Component row = line(e.getValue().name, value);
-            src.sendSuccess(() -> row, false);
+            String id = e.getKey();
+            String name = e.getValue().name;
+            spawnRow(src, name + " (zone de jeu)", id);
+            spawnRow(src, name + " (base)", "base:" + id);
+            spawnRow(src, name + " (respawn mort)", "respawn:" + id);
         }
+        spawnRow(src, "Conseil", "conseil");
+        spawnRow(src, "Élimination", "elimination");
         return 1;
+    }
+
+    private static void spawnRow(CommandSourceStack src, String label, String key) {
+        SpawnManager.Spawn s = SpawnManager.get(key);
+        Component value = s == null
+                ? Component.literal("non défini").withStyle(ChatFormatting.RED)
+                : Component.literal(String.format("%s  %.1f %.1f %.1f", s.dimension, s.x, s.y, s.z))
+                        .withStyle(ChatFormatting.GREEN);
+        Component row = line(label, value);
+        src.sendSuccess(() -> row, false);
     }
 
     private static int gameFreeze(CommandContext<CommandSourceStack> ctx) {
@@ -626,7 +739,7 @@ public final class KLCommand {
         Component msg = Component.empty()
                 .append(Component.literal("ATTENTION ").withStyle(ChatFormatting.RED, ChatFormatting.BOLD))
                 .append(Component.literal("Remise à zéro de '" + target + "'. Tape ").withStyle(ChatFormatting.GRAY))
-                .append(Component.literal("/kl ranking reset confirm").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD))
+                .append(Component.literal("/ccis ranking reset confirm").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD))
                 .append(Component.literal(" dans les 30 secondes pour confirmer (copie de secours automatique).")
                         .withStyle(ChatFormatting.GRAY));
         ctx.getSource().sendSuccess(() -> msg, false);
@@ -650,6 +763,324 @@ public final class KLCommand {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         String result = Placeholders.apply(StringArgumentType.getString(ctx, "texte"), player);
         ctx.getSource().sendSuccess(() -> fr.cosmicisland.Txt.of(result), false);
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- conseil
+
+    private static final SuggestionProvider<CommandSourceStack> SPAWN_IDS =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(
+                    Stream.concat(TeamManager.ids().stream(), Stream.of("conseil", "elimination")), builder);
+
+    private static int conseilStart(CommandContext<CommandSourceStack> ctx) {
+        String err = ConseilManager.start(StringArgumentType.getString(ctx, "equipe"));
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int conseilTest(CommandContext<CommandSourceStack> ctx, int fakes) {
+        String err = ConseilManager.start(StringArgumentType.getString(ctx, "equipe"), fakes);
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int conseilMenu(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String err = ConseilAdminMenu.open(ctx.getSource().getPlayerOrException());
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int conseilStatus(CommandContext<CommandSourceStack> ctx) {
+        for (Component c : ConseilManager.statusLines()) {
+            ctx.getSource().sendSuccess(() -> c, false);
+        }
+        return 1;
+    }
+
+    private static int conseilAction(CommandContext<CommandSourceStack> ctx, String action) {
+        String err = switch (action) {
+            case "voteclose" -> ConseilManager.closeVote();
+            case "reveal" -> ConseilManager.reveal();
+            case "revote" -> ConseilManager.revote();
+            case "close" -> ConseilManager.close();
+            case "cancel" -> ConseilManager.cancel();
+            default -> "Action inconnue.";
+        };
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int conseilImmunity(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        int done = 0;
+        for (GameProfile profile : profiles) {
+            String err = ConseilManager.toggleImmune(profile.getId());
+            if (err != null) {
+                ctx.getSource().sendFailure(Component.literal(profile.getName() + " : " + err));
+            } else {
+                done++;
+            }
+        }
+        return done;
+    }
+
+    private static int conseilVote(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String err = ConseilMenus.openVote(ctx.getSource().getPlayerOrException());
+        if (err != null) {
+            ctx.getSource().sendFailure(Component.literal(err));
+            return 0;
+        }
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- aide et annonces
+
+    private record HelpEntry(String command, String description, int level) {}
+
+    private static final List<HelpEntry> HELP = List.of(
+            // Tous les joueurs
+            new HelpEntry("/ccis help", "Affiche cette aide (selon ton grade)", KLPermissions.NONE),
+            new HelpEntry("/ccis info", "Ton rôle, ton grade staff et ton équipe", KLPermissions.NONE),
+            new HelpEntry("/ccis join", "Rejoindre une épreuve (boutons du chat)", KLPermissions.NONE),
+            new HelpEntry("/ccis decline", "Refuser une épreuve (boutons du chat)", KLPermissions.NONE),
+            new HelpEntry("/ccis vote", "Rouvrir le menu de vote du conseil", KLPermissions.NONE),
+            new HelpEntry("/ccis base  (ou /base)", "Retourner à la base de ton équipe (impossible pendant une épreuve)", KLPermissions.NONE),
+            new HelpEntry("/ccis ranking", "Classement général des victoires", KLPermissions.NONE),
+            new HelpEntry("/ccis ranking jeu <jeu>", "Classement d'un jeu", KLPermissions.NONE),
+            new HelpEntry("/ccis ranking joueur <pseudo>", "Victoires d'un joueur", KLPermissions.NONE),
+            // Organisateurs
+            new HelpEntry("/ccis games", "Liste des épreuves et leur état", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis start <jeu>", "Envoie les invitations d'une épreuve", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis freeze | unfreeze", "Immobilise ou libère les participants", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis go", "Lance le décompte et le départ", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis stop [jeu]", "Arrête l'épreuve en cours", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis team list|add|remove|name|tag|color", "Gérer les équipes", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis poteaux zone pos1|pos2|info", "Zone d'eau des poteaux", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis poteaux check", "Qui est sur un poteau ?", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis conseil start|test <équipe>", "Lancer un conseil (ou un test)", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis conseil menu|status", "Menu et état du conseil", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis conseil vote close|reveal|revote|close|cancel", "Piloter le conseil", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis conseil immunite <joueur>", "Activer ou retirer l'immunité", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis campfire status|tp <équipe>", "État des feux de camp, se téléporter à un feu", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis say <message>", "Annonce visible par tout le monde", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis placeholder <texte>", "Tester les placeholders", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis admin", "Menu admin : épreuves, équipes, joueurs, conseil, classement, spawns", KLPermissions.ORGANISATEUR),
+            // Admins
+            new HelpEntry("/ccis reload", "Recharge les fichiers de config", KLPermissions.ADMIN),
+            new HelpEntry("/ccis role set|get <joueur> [rôle]", "Gérer les rôles (participant, spectateur, organisateur)", KLPermissions.ADMIN),
+            new HelpEntry("/ccis enable|disable <jeu>", "Activer ou désactiver un jeu", KLPermissions.ADMIN),
+            new HelpEntry("/ccis campfire set|remove|fuel <équipe>", "Définir (en regardant le feu), retirer, régler la jauge", KLPermissions.ADMIN),
+            new HelpEntry("/ccis team merge", "Fusion des équipes en tribu unique", KLPermissions.ADMIN),
+            new HelpEntry("/ccis spawn set|tp|list", "Zone de jeu des équipes, conseil, élimination", KLPermissions.ADMIN),
+            new HelpEntry("/ccis spawn base|respawn set|tp <équipe>", "Base et respawn (mort) des équipes", KLPermissions.ADMIN),
+            new HelpEntry("/ccis spawn jeu <jeu> <équipe>", "Point d'équipe propre à un jeu", KLPermissions.ADMIN),
+            new HelpEntry("/ccis ranking reset|add", "Remise à zéro et corrections du classement", KLPermissions.ADMIN));
+
+    private static int help(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        boolean player = src.getEntity() instanceof ServerPlayer;
+        int level = player ? KLPermissions.levelOf((ServerPlayer) src.getEntity()) : KLPermissions.ADMIN;
+        String grade = !player ? "console"
+                : level == KLPermissions.ADMIN ? "admin"
+                : level == KLPermissions.ORGANISATEUR ? "organisateur" : "joueur";
+        src.sendSuccess(() -> Component.literal("=== Commandes /ccis (" + grade + ") ===")
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+        for (HelpEntry e : HELP) {
+            if (e.level() <= level) {
+                Component row = Component.empty()
+                        .append(Component.literal(e.command()).withStyle(ChatFormatting.YELLOW))
+                        .append(Component.literal("  " + e.description()).withStyle(ChatFormatting.GRAY));
+                src.sendSuccess(() -> row, false);
+            }
+        }
+        return 1;
+    }
+
+    /** Annonce visible par tous les joueurs, quelle que soit leur equipe. */
+    private static int say(CommandContext<CommandSourceStack> ctx) {
+        Component msg = Component.empty()
+                .append(Component.literal("[Annonce] ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
+                .append(fr.cosmicisland.Txt.of(StringArgumentType.getString(ctx, "texte")));
+        ctx.getSource().getServer().getPlayerList().broadcastSystemMessage(msg, false);
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- base et respawn
+
+    /** /ccis base (et /base) : retour a la base de son equipe, impossible pendant une epreuve ou un conseil. */
+    private static int goBase(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        if (GameManager.isInGame(player.getUUID())) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Tu ne peux pas rentrer à ta base avant la fin de l'épreuve."));
+            return 0;
+        }
+        if (ConseilManager.phase() != ConseilManager.Phase.IDLE && ConseilManager.isCandidate(player.getUUID())) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Tu ne peux pas rentrer à ta base avant la fin du conseil."));
+            return 0;
+        }
+        String team = TeamManager.teamIdOf(player.getUUID());
+        if (team == null) {
+            ctx.getSource().sendFailure(Component.literal("Tu n'as pas d'équipe."));
+            return 0;
+        }
+        SpawnManager.Spawn base = SpawnManager.get("base:" + team);
+        if (base == null) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "La base de ton équipe n'est pas définie : préviens un organisateur."));
+            return 0;
+        }
+        if (!SpawnManager.teleport(ctx.getSource().getServer(), player, base)) {
+            ctx.getSource().sendFailure(Component.literal("Dimension de la base introuvable."));
+            return 0;
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("Retour à ta base.")
+                .withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    private static int teamSpawnSet(CommandContext<CommandSourceStack> ctx, String prefix) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        SpawnManager.set(prefix + StringArgumentType.getString(ctx, "equipe").toLowerCase(), player);
+        String what = prefix.equals("base:") ? "Base" : "Point de respawn";
+        String msg = what + " de l'équipe " + team.name + " défini à ta position.";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    private static int teamSpawnTp(CommandContext<CommandSourceStack> ctx, String prefix) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        SpawnManager.Spawn spawn = SpawnManager.get(prefix + StringArgumentType.getString(ctx, "equipe").toLowerCase());
+        if (spawn == null) {
+            ctx.getSource().sendFailure(Component.literal("Spawn non défini pour l'équipe " + team.name + "."));
+            return 0;
+        }
+        if (!SpawnManager.teleport(ctx.getSource().getServer(), player, spawn)) {
+            ctx.getSource().sendFailure(Component.literal("Dimension du spawn introuvable : " + spawn.dimension));
+            return 0;
+        }
+        return 1;
+    }
+
+    /** Point d'equipe propre a un jeu (remplace le point d'equipe general pour ce jeu). */
+    private static int gameZoneSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        String game = StringArgumentType.getString(ctx, "jeu").toLowerCase();
+        if (GameRegistry.get(game) == null) {
+            ctx.getSource().sendFailure(Component.literal("Jeu inconnu : " + game));
+            return 0;
+        }
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        SpawnManager.set("zone:" + game + ":" + StringArgumentType.getString(ctx, "equipe").toLowerCase(), player);
+        String msg = "Point de l'équipe " + team.name + " pour le jeu " + game + " défini à ta position.";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    // ---------------------------------------------------------------- feu de camp
+
+    private static int campfireStatus(CommandContext<CommandSourceStack> ctx) {
+        for (Component c : CampfireManager.statusLines()) {
+            ctx.getSource().sendSuccess(() -> c, false);
+        }
+        return 1;
+    }
+
+    private static int campfireTp(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        CampfireManager.Fire fire = CampfireManager.get(StringArgumentType.getString(ctx, "equipe"));
+        if (fire == null) {
+            ctx.getSource().sendFailure(Component.literal("Aucun feu défini pour l'équipe " + team.name + "."));
+            return 0;
+        }
+        if (!CampfireManager.teleportTo(player, fire)) {
+            ctx.getSource().sendFailure(Component.literal("Dimension du feu introuvable."));
+            return 0;
+        }
+        return 1;
+    }
+
+    /** Definit le feu de l'equipe : il faut regarder un bloc "campfire" (a moins de 8 blocs). */
+    private static int campfireSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        HitResult hit = player.pick(8.0, 1.0f, false);
+        if (hit.getType() != HitResult.Type.BLOCK || !(hit instanceof BlockHitResult)) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Regarde un feu de camp (bloc campfire) à moins de 8 blocs, puis relance la commande."));
+            return 0;
+        }
+        net.minecraft.core.BlockPos pos = ((BlockHitResult) hit).getBlockPos();
+        if (!(player.level().getBlockState(pos).getBlock() instanceof CampfireBlock)) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Ce bloc n'est pas un feu de camp. Pose un campfire et regarde-le."));
+            return 0;
+        }
+        CampfireManager.set(StringArgumentType.getString(ctx, "equipe"), player.serverLevel(), pos);
+        String msg = "Feu de camp de l'équipe " + team.name + " défini en " + pos.getX() + " " + pos.getY() + " " + pos.getZ() + ".";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    private static int campfireRemove(CommandContext<CommandSourceStack> ctx) {
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        if (!CampfireManager.remove(StringArgumentType.getString(ctx, "equipe"))) {
+            ctx.getSource().sendFailure(Component.literal("Aucun feu défini pour l'équipe " + team.name + "."));
+            return 0;
+        }
+        String msg = "Feu de camp de l'équipe " + team.name + " retiré.";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        return 1;
+    }
+
+    private static int campfireFuel(CommandContext<CommandSourceStack> ctx) {
+        TeamManager.KLTeam team = findTeam(ctx);
+        if (team == null) {
+            return 0;
+        }
+        String id = StringArgumentType.getString(ctx, "equipe");
+        if (CampfireManager.get(id) == null) {
+            ctx.getSource().sendFailure(Component.literal("Aucun feu défini pour l'équipe " + team.name + "."));
+            return 0;
+        }
+        double value = DoubleArgumentType.getDouble(ctx, "valeur");
+        CampfireManager.setFuel(id, value);
+        String msg = "Jauge du feu de l'équipe " + team.name + " : " + CampfireManager.percent(CampfireManager.get(id)) + "%.";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
         return 1;
     }
 }

@@ -2,6 +2,9 @@ package fr.cosmicisland;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import fr.cosmicisland.camp.CampfireManager;
+import fr.cosmicisland.chat.ChatManager;
+import fr.cosmicisland.conseil.ConseilManager;
 import fr.cosmicisland.game.GameRegistry;
 import fr.cosmicisland.game.RankingManager;
 import fr.cosmicisland.game.SpawnManager;
@@ -68,7 +71,7 @@ public final class KLFiles {
         }
     }
 
-    /** Recharge tous les fichiers du mod (utilise au demarrage et par /kl reload). */
+    /** Recharge tous les fichiers du mod (utilise au demarrage et par /ccis reload). */
     public static void loadAll() {
         CosmicIsland.LOGGER.info("Cosmic Island - dossier de config : {}", dir().toAbsolutePath());
         KLPermissions.load();
@@ -76,6 +79,9 @@ public final class KLFiles {
         TeamManager.load();
         SpawnManager.load();
         RankingManager.load();
+        ConseilManager.load();
+        ChatManager.load();
+        CampfireManager.load();
         GameRegistry.loadConfigs();
     }
 }

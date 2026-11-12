@@ -26,15 +26,15 @@ public interface KLGame {
     /** Appele a chaque tick serveur pendant que le jeu tourne. */
     default void onTick(GameContext ctx) {}
 
-    /** Appele a la fin du jeu (cancelled = true si arrete par /kl stop). */
+    /** Appele a la fin du jeu (cancelled = true si arrete par /ccis stop). */
     default void onStop(GameContext ctx, boolean cancelled) {}
 
-    /** Appele par /kl go avant le decompte. Retourne un message d'erreur pour refuser le depart, ou null. */
+    /** Appele par /ccis go avant le decompte. Retourne un message d'erreur pour refuser le depart, ou null. */
     default String canStart(GameContext ctx) {
         return null;
     }
 
-    /** Commandes propres au jeu, ajoutees sous /kl (ex. Commands.literal("poteaux")...). null = aucune. */
+    /** Commandes propres au jeu, ajoutees sous /ccis (ex. Commands.literal("poteaux")...). null = aucune. */
     default LiteralArgumentBuilder<CommandSourceStack> commands() {
         return null;
     }

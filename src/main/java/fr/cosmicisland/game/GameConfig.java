@@ -62,6 +62,8 @@ public class GameConfig {
     public List<String> allowedTeams = new ArrayList<>(List.of("rouge", "jaune", "blanche"));
     public String gameMode = "survival";
     public boolean clearInventoryOnJoin = true;
+    public boolean campfireDebuff = true; // le malus du feu de camp eteint s'applique a ce jeu
+    public boolean endAtTeamSpawn = true; // fin d'epreuve : retour au point d'equipe de la zone de jeu (sinon position d'origine)
     public boolean freezeDuringCountdown = true; // joueurs immobilises pendant le decompte
     public boolean showTimer = true;             // barre de temps (boss bar) pendant l'epreuve
     public String timerLabelRemaining = "&e&lTemps restant : &f{time}";
