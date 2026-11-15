@@ -271,15 +271,14 @@ public final class AdminMenus {
             if (slot < 9 && slot < ids.size()) {
                 openTeamDetail(p, ids.get(slot));
             } else if (slot == 22) {
-                if (needAdmin(p)) {
+                if (KLPermissions.levelOf(p) < KLPermissions.ORGANISATEUR) {
+                    msg(p, "&cRéservé aux organisateurs et admins.");
+                } else {
                     confirm(p, "{v_reunification} des équipes",
-                            "Annonce à tous, puis tout le monde passe dans l'équipe " + TeamManager.MERGED_ID + ".",
+                            "Annonce à tous, puis tout le monde passe dans l'équipe unique.",
                             () -> {
-                                if (TeamManager.merge()) {
-                                    msg(p, "&a{v_reunification} effectuée.");
-                                } else {
-                                    msg(p, "&cL'équipe " + TeamManager.MERGED_ID + " n'existe pas.");
-                                }
+                                TeamManager.merge(null);
+                                msg(p, "&a{v_reunification} effectuée.");
                                 openTeams(p);
                             },
                             () -> openTeams(p));
@@ -316,8 +315,8 @@ public final class AdminMenus {
         }
         c.setItem(22, MenuItems.named(Items.NETHER_STAR, "&d&l{v_reunification} des équipes", List.of(
                 "&7État : " + (TeamManager.isMerged() ? "&afusionnées" : "&7séparées"),
-                "&7Tous les joueurs passent dans l'équipe " + TeamManager.MERGED_ID + ".",
-                "&8Admin uniquement")));
+                "&7Tous les joueurs passent dans l'équipe unique.",
+                "&8Organisateur ou admin (nom : /ccis fusion <nom>)")));
         c.setItem(26, backItem("Menu principal"));
     }
 

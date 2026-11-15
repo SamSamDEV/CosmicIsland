@@ -37,7 +37,8 @@ public class BandStandLayer extends RenderLayer<ArmorStand, ArmorStandArmorModel
             BandLayer.draw(poseStack, buffer, light, getParentModel().head, head, BandLayer.TEX_HEAD, headStack);
         }
         ItemStack chestStack = stand.getItemBySlot(EquipmentSlot.CHEST);
-        if (chestStack.getItem() == BandeauItems.BRASSARD && getParentModel().leftArm.visible) {
+        // affiche meme sans bras (comme l'armure du jeu : les manches restent visibles sur un armor stand sans bras)
+        if (chestStack.getItem() == BandeauItems.BRASSARD) {
             BandLayer.draw(poseStack, buffer, light, getParentModel().leftArm, arm, BandLayer.TEX_ARM, chestStack);
         }
     }

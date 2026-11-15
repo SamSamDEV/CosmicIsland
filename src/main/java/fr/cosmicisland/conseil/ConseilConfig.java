@@ -62,6 +62,8 @@ public class ConseilConfig {
         m.put("totemProtected", title("&6&l{nom}", "&7est protégé par &e&l{v_le_totem}", "minecraft:block.beacon.activate"));
         m.put("totemGiven", title("&6&l{V_totem}", "&7Pose-le ou cache-le : il te protège au prochain {v_le_conseil}",
                 "minecraft:ui.toast.challenge_complete"));
+        m.put("tieVote", title("&e&lSECOND VOTE", "&7Seuls à égalité : &f{noms}", "minecraft:block.note_block.bass"));
+        m.put("tieNoVote", chat("&e&l{V_conseil} &7: tu es à égalité, tu ne votes pas à ce tour. Les autres départagent."));
         m.put("farewell", chat("&7Tu quittes l'aventure. Merci d'avoir joué !"));
         return m;
     }

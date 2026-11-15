@@ -75,6 +75,11 @@ public final class ConseilManager {
     private static int voteTicksTotal = -1;
     private static ServerBossEvent bar;
 
+    // Second vote apres une egalite : seuls les joueurs a egalite sont votables, et ils ne votent pas (comme a la tele)
+    private static final Set<UUID> restrictTargets = new LinkedHashSet<>();
+    private static final Set<UUID> nonVoters = new LinkedHashSet<>();
+    private static List<UUID> tieLeaders = new ArrayList<>();
+
     private static UUID eliminated = null;
     private static String lastResult = ""; // eliminated, tie, noValid
 
@@ -162,6 +167,26 @@ public final class ConseilManager {
 
     public static boolean isTotemProtected(UUID id) {
         return totemProtected.contains(id);
+    }
+
+    /** Ce joueur peut-il etre vote ce tour-ci (second vote : seulement les joueurs a egalite) ? */
+    public static boolean isTargetAllowed(UUID id) {
+        return restrictTargets.isEmpty() || restrictTargets.contains(id);
+    }
+
+    /** Ce joueur a-t-il le droit de voter ce tour-ci ? */
+    public static boolean canVote(UUID id) {
+        return candidates.containsKey(id) && !nonVoters.contains(id);
+    }
+
+    private static int expectedVoters() {
+        int n = 0;
+        for (UUID id : candidates.keySet()) {
+            if (!nonVoters.contains(id)) {
+                n++;
+            }
+        }
+        return n;
     }
 
     public static boolean isImmune(UUID id) {
@@ -329,8 +354,12 @@ public final class ConseilManager {
         for (UUID id : candidates.keySet()) {
             ServerPlayer p = online(id);
             if (p != null) {
-                ConseilMessages.send(config.message("voteStart"), p, Map.of("equipe", teamName()));
-                ConseilMenus.openVote(p);
+                if (nonVoters.contains(id)) {
+                    ConseilMessages.send(config.message("tieNoVote"), p, Map.of("equipe", teamName()));
+                } else {
+                    ConseilMessages.send(config.message("voteStart"), p, Map.of("equipe", teamName()));
+                    ConseilMenus.openVote(p);
+                }
             }
         }
         castFakeVotes();
@@ -347,9 +376,12 @@ public final class ConseilManager {
         List<UUID> all = new ArrayList<>(candidates.keySet());
         Random random = new Random();
         for (UUID fake : fakes) {
+            if (nonVoters.contains(fake)) {
+                continue;
+            }
             List<UUID> options = new ArrayList<>();
             for (UUID id : all) {
-                if (config.allowSelfVote || !id.equals(fake)) {
+                if (isTargetAllowed(id) && (config.allowSelfVote || !id.equals(fake))) {
                     options.add(id);
                 }
             }
@@ -370,8 +402,14 @@ public final class ConseilManager {
         if (!candidates.containsKey(id)) {
             return "Tu ne participes pas à {v_au_conseil}.";
         }
+        if (nonVoters.contains(id)) {
+            return "Tu es à égalité : tu ne votes pas à ce tour.";
+        }
         if (!candidates.containsKey(target)) {
             return "Ce joueur ne peut pas être voté.";
+        }
+        if (!isTargetAllowed(target)) {
+            return "Seuls les joueurs à égalité peuvent être votés à ce tour.";
         }
         if (id.equals(target) && !config.allowSelfVote) {
             return "Tu ne peux pas voter pour toi-même.";
@@ -383,8 +421,8 @@ public final class ConseilManager {
         votes.put(id, target);
         ConseilMessages.send(config.message("voteRecap"), voter, Map.of("cible", candidates.get(target)));
         notifyStaff("&f" + voter.getGameProfile().getName() + "&7 a voté (&f" + votes.size() + "&7/&f"
-                + candidates.size() + "&7)" + (first ? "" : " &8(vote modifié)"));
-        if (votes.size() >= candidates.size()) {
+                + expectedVoters() + "&7)" + (first ? "" : " &8(vote modifié)"));
+        if (votes.size() >= expectedVoters()) {
             notifyStaff("Tout le monde a voté : clos le vote avec &f/ccis conseil vote close&7 ou le menu.");
         }
         saveState();
@@ -634,6 +672,7 @@ public final class ConseilManager {
         } else {
             lastResult = "tie";
             eliminated = null;
+            tieLeaders = new ArrayList<>(leaders);
         }
         phase = Phase.REVEALED;
         recordRound(false);
@@ -668,12 +707,32 @@ public final class ConseilManager {
         if (phase != Phase.CLOSED && phase != Phase.REVEALED) {
             return "Impossible pendant le vote ou le dépouillement.";
         }
+        boolean tie = phase == Phase.REVEALED && lastResult.equals("tie") && tieLeaders.size() > 1;
         if (phase == Phase.CLOSED) {
             recordRound(true); // tour ecarte avant depouillement : on garde une trace dans le log
         }
+        restrictTargets.clear();
+        nonVoters.clear();
+        if (tie) {
+            // second vote : seulement entre les joueurs a egalite, qui ne votent pas ; en boucle tant qu'il y a egalite
+            restrictTargets.addAll(tieLeaders);
+            nonVoters.addAll(tieLeaders);
+        }
         round++;
         startVoting();
-        notifyStaff("Nouveau vote lancé (tour &f" + round + "&7). Les immunités sont conservées.");
+        if (tie) {
+            List<String> names = new ArrayList<>();
+            for (UUID id : restrictTargets) {
+                names.add(candidates.getOrDefault(id, "?"));
+            }
+            for (ServerPlayer p : audience()) {
+                ConseilMessages.send(config.message("tieVote"), p, Map.of("noms", String.join(", ", names), "equipe", teamName()));
+            }
+            notifyStaff("Second vote (tour &f" + round + "&7) : seuls &f" + String.join(", ", names)
+                    + "&7 sont votables, et ils ne votent pas. Les immunités sont conservées pour ce {v_conseil}.");
+        } else {
+            notifyStaff("Nouveau vote lancé (tour &f" + round + "&7). Les immunités sont conservées.");
+        }
         return null;
     }
 
@@ -787,6 +846,9 @@ public final class ConseilManager {
         voteTicksTotal = -1;
         eliminated = null;
         lastResult = "";
+        restrictTargets.clear();
+        nonVoters.clear();
+        tieLeaders = new ArrayList<>();
     }
 
     // ------------------------------------------------------------ tick
@@ -1010,6 +1072,9 @@ public final class ConseilManager {
         Map<String, String> votes = new LinkedHashMap<>();
         List<String> immune = new ArrayList<>();
         List<String> totem = new ArrayList<>();
+        List<String> restrict = new ArrayList<>();
+        List<String> nonVoters = new ArrayList<>();
+        List<String> tieLeaders = new ArrayList<>();
         Map<String, Integer> tally = new LinkedHashMap<>();
         List<String> rounds = new ArrayList<>();
     }
@@ -1055,6 +1120,15 @@ public final class ConseilManager {
         for (UUID id : totemProtected) {
             st.totem.add(id.toString());
         }
+        for (UUID id : restrictTargets) {
+            st.restrict.add(id.toString());
+        }
+        for (UUID id : nonVoters) {
+            st.nonVoters.add(id.toString());
+        }
+        for (UUID id : tieLeaders) {
+            st.tieLeaders.add(id.toString());
+        }
         if (phase == Phase.REVEALED) {
             for (Map.Entry<UUID, Integer> e : tally.entrySet()) {
                 st.tally.put(e.getKey().toString(), e.getValue());
@@ -1097,15 +1171,24 @@ public final class ConseilManager {
             for (String id : st.totem) {
                 totemProtected.add(UUID.fromString(id));
             }
+            for (String id : st.restrict) {
+                restrictTargets.add(UUID.fromString(id));
+            }
+            for (String id : st.nonVoters) {
+                nonVoters.add(UUID.fromString(id));
+            }
+            for (String id : st.tieLeaders) {
+                tieLeaders.add(UUID.fromString(id));
+            }
             for (Map.Entry<String, Integer> e : st.tally.entrySet()) {
                 tally.put(UUID.fromString(e.getKey()), e.getValue());
             }
             for (String r : st.rounds) {
                 rounds.add(com.google.gson.JsonParser.parseString(r).getAsJsonObject());
             }
-            CosmicIsland.LOGGER.info("{v_conseil} restaure apres redemarrage : equipe {}, phase {}", teamId, phase);
+            CosmicIsland.LOGGER.info("Conseil restaure apres redemarrage : equipe {}, phase {}", teamId, phase);
         } catch (Exception e) {
-            CosmicIsland.LOGGER.error("Etat {v_du_conseil} illisible : ignore", e);
+            CosmicIsland.LOGGER.error("Etat du conseil illisible : ignore", e);
             resetMemory();
         }
     }

@@ -27,6 +27,10 @@ public class ChatEvents {
         if (RoleManager.effective(player) == KLRole.SPECTATEUR && ChatManager.config().spectatorChat) {
             return "spectateurs";
         }
+        if (ChatManager.config().globalDuringConseil
+                && fr.cosmicisland.conseil.ConseilManager.phase() != fr.cosmicisland.conseil.ConseilManager.Phase.IDLE) {
+            return "global";
+        }
         String team = TeamManager.teamIdOf(player.getUUID());
         if (team != null) {
             return "equipe:" + team;

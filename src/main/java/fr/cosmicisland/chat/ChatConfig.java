@@ -19,10 +19,19 @@ public class ChatConfig {
     /** Les messages d'un spectateur ne vont qu'aux spectateurs et au staff (pas aux joueurs encore en jeu). */
     public boolean spectatorChat = true;
 
+    /** Pendant un {v_conseil} (phase active), tous les participants se lisent entre eux pour pouvoir débattre. */
+    public boolean globalDuringConseil = true;
+
+    /** Format d'un message envoye a l'organisation ({joueur}, {message}). */
+    public String orgaFormat = "&6[→ORGA] &f{joueur}&7 : &f{message}";
+
+    /** Format de la reponse de l'organisation ({auteur}, {message}). */
+    public String orgaReplyFormat = "&6[ORGA → toi] &f{auteur}&7 : &f{message}";
+
     public String spectatorPrefix = "&8[SPEC] ";
 
     /** Commandes vanilla interdites aux joueurs (le staff n'est pas concerne). Sans le "/". */
-    public List<String> blockedCommands = new ArrayList<>(List.of("msg", "tell", "w", "me"));
+    public List<String> blockedCommands = new ArrayList<>(List.of("msg", "tell", "w", "me", "teammsg", "tm", "r", "reply", "dm"));
 
     public String blockedMessage = "&cCette commande est désactivée pendant l'aventure.";
 

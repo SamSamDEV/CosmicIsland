@@ -59,7 +59,23 @@ public class GameConfig {
     public int countdownSeconds = 3;
     public int durationSeconds = -1; // duree max en secondes ; -1 = temps infini
     public int reminderSeconds = 0;  // 0 = pas de rappel
-    public List<String> allowedTeams = new ArrayList<>(List.of("rouge", "jaune", "blanche"));
+    /** Equipes qui jouent ce jeu. Vide ou "*" = toutes (y compris les equipes creees plus tard et l'equipe de fusion). */
+    public List<String> allowedTeams = new ArrayList<>();
+
+    public boolean allowsTeam(String teamId) {
+        if (teamId == null) {
+            return false;
+        }
+        if (allowedTeams == null || allowedTeams.isEmpty() || allowedTeams.contains("*")
+                || teamId.equals(fr.cosmicisland.TeamManager.MERGED_ID)) {
+            return true;
+        }
+        // ancien reglage par defaut (rouge, jaune, blanche) : equivaut a "toutes"
+        if (allowedTeams.size() == 3 && allowedTeams.containsAll(List.of("rouge", "jaune", "blanche"))) {
+            return true;
+        }
+        return fr.cosmicisland.TeamManager.listContains(allowedTeams, teamId);
+    }
     public String gameMode = "survival";
     public boolean clearInventoryOnJoin = true;
     public boolean campfireDebuff = true; // le malus du feu de camp eteint s'applique a ce jeu

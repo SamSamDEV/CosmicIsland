@@ -170,7 +170,7 @@ public final class GameManager {
                 continue;
             }
             String team = TeamManager.teamIdOf(p.getUUID());
-            if (team == null || !fr.cosmicisland.TeamManager.listContains(c.allowedTeams, team)) {
+            if (team == null || !c.allowsTeam(team)) {
                 continue;
             }
             if (SpawnManager.zoneSpawn(g.id(), team) == null) {

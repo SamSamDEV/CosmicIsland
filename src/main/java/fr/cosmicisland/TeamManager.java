@@ -29,8 +29,8 @@ import java.util.UUID;
  * (tab, chat, nom au-dessus de la tete).
  */
 public final class TeamManager {
-    /** Equipe qui recoit tout le monde lors de la fusion. */
-    public static final String MERGED_ID = "blanche";
+    /** Equipe qui recoit tout le monde lors de la fusion (creee au moment de la fusion). */
+    public static final String MERGED_ID = "fusion";
 
     public static class KLTeam {
         public String name = "";
@@ -70,7 +70,6 @@ public final class TeamManager {
         Store s = new Store();
         s.teams.put("rouge", new KLTeam("Rouge", "[ROUGE]", ChatFormatting.RED));
         s.teams.put("jaune", new KLTeam("Jaune", "[JAUNE]", ChatFormatting.YELLOW));
-        s.teams.put("blanche", new KLTeam("Blanche", "[BLANCHE]", ChatFormatting.WHITE));
         return s;
     }
 
@@ -176,11 +175,83 @@ public final class TeamManager {
         }
     }
 
-    /** Fusion : tout le monde passe dans l'equipe "blanche". Retourne false si elle n'existe pas. */
-    public static boolean merge() {
+    /** Nombre d'equipes de jeu (hors equipe de fusion). */
+    public static int gameTeamCount() {
+        int n = 0;
+        for (String id : store.teams.keySet()) {
+            if (!id.equals(MERGED_ID)) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Identifiant d'equipe valide : lettres minuscules, chiffres et _ (jamais d'espace). */
+    public static boolean validId(String id) {
+        return id != null && id.matches("[a-z0-9_]{1,16}");
+    }
+
+    /**
+     * Cree une equipe (autant que de couleurs). Retourne un message d'erreur, ou null si c'est fait.
+     * Le nom par defaut est l'identifiant avec une majuscule ; le tag suit le nom.
+     */
+    public static String createTeam(String id, ChatFormatting color) {
+        id = id.toLowerCase();
+        if (!validId(id)) {
+            return "Identifiant invalide (lettres, chiffres et _ uniquement, 16 max).";
+        }
+        if (id.equals(MERGED_ID) || store.teams.containsKey(id) || resolveId(id) != null) {
+            return "Une équipe porte déjà ce nom ou cet identifiant.";
+        }
+        if (color == null || !color.isColor()) {
+            return "Il faut une couleur (red, blue, green, gold...).";
+        }
+        String name = Character.toUpperCase(id.charAt(0)) + id.substring(1).replace('_', ' ');
+        KLTeam team = new KLTeam(name, autoTagFor(name), color);
+        // l'equipe de fusion reste toujours en derniere position
+        KLTeam fused = store.teams.remove(MERGED_ID);
+        store.teams.put(id, team);
+        if (fused != null) {
+            store.teams.put(MERGED_ID, fused);
+        }
+        changed();
+        return null;
+    }
+
+    /** Supprime une equipe (minimum 2 equipes de jeu). Retourne un message d'erreur, ou null si c'est fait. */
+    public static String deleteTeam(String idOrName) {
+        String id = resolveId(idOrName);
+        if (id == null) {
+            return "Équipe inconnue.";
+        }
+        if (id.equals(MERGED_ID)) {
+            unmerge();
+            return null;
+        }
+        if (gameTeamCount() <= 2) {
+            return "Il faut au minimum 2 équipes.";
+        }
+        store.teams.remove(id);
+        fr.cosmicisland.camp.CampfireManager.remove(id);
+        changed();
+        return null;
+    }
+
+    /**
+     * Fusion (lancee a la main par un admin ou un organisateur) : l'equipe de fusion est creee si besoin
+     * (nom choisi, sinon le terme "Fusion" du vocabulaire), tout le monde y passe, annonce a tous.
+     */
+    public static boolean merge(String chosenName) {
         KLTeam target = store.teams.get(MERGED_ID);
         if (target == null) {
-            return false;
+            String name = chosenName == null || chosenName.isBlank() ? Vocab.nom("reunification") : chosenName.trim();
+            target = new KLTeam(name, autoTagFor(name), ChatFormatting.LIGHT_PURPLE);
+            store.teams.put(MERGED_ID, target);
+        } else if (chosenName != null && !chosenName.isBlank()) {
+            target.name = chosenName.trim();
+            if (target.autoTag) {
+                target.tag = autoTagFor(target.name);
+            }
         }
         for (KLTeam team : store.teams.values()) {
             if (team != target) {
@@ -194,9 +265,12 @@ public final class TeamManager {
         return true;
     }
 
-    /** Retour aux equipes separees (les joueurs ne sont pas deplaces : il faut les reassigner). */
+    /** Retour aux equipes separees : l'equipe de fusion est supprimee (ses joueurs sont sans equipe, a reassigner). */
     public static void unmerge() {
         store.merged = false;
+        if (store.teams.remove(MERGED_ID) != null) {
+            fr.cosmicisland.camp.CampfireManager.remove(MERGED_ID);
+        }
         changed();
     }
 
@@ -220,7 +294,7 @@ public final class TeamManager {
         if (missing.isEmpty()) {
             return;
         }
-        Component warning = Txt.of("&6[{v_reunification}] &7Il manque pour l'équipe " + MERGED_ID + " : &f" + String.join(", ", missing));
+        Component warning = Txt.of("&6[{v_reunification}] &7Il manque pour l'équipe " + MERGED_ID + " (" + plain(store.teams.get(MERGED_ID).name) + ") : &f" + String.join(", ", missing));
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (KLPermissions.levelOf(p) >= KLPermissions.ORGANISATEUR) {
                 p.sendSystemMessage(warning);

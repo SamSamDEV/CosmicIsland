@@ -15,4 +15,25 @@ public final class Txt {
     public static MutableComponent of(String text) {
         return Component.literal(Vocab.apply(text).replace('&', '\u00a7'));
     }
+
+    /** Reponse de commande reussie : coche verte. */
+    public static MutableComponent ok(String text) {
+        return Component.empty()
+                .append(Component.literal("\u2714 ").withStyle(net.minecraft.ChatFormatting.GREEN, net.minecraft.ChatFormatting.BOLD))
+                .append(lit(text).withStyle(net.minecraft.ChatFormatting.GREEN));
+    }
+
+    /** Reponse de commande en echec : croix rouge. */
+    public static MutableComponent err(String text) {
+        return Component.empty()
+                .append(Component.literal("\u2718 ").withStyle(net.minecraft.ChatFormatting.RED, net.minecraft.ChatFormatting.BOLD))
+                .append(lit(text).withStyle(net.minecraft.ChatFormatting.RED));
+    }
+
+    /** Information neutre : puce doree. */
+    public static MutableComponent info(String text) {
+        return Component.empty()
+                .append(Component.literal("\u25B8 ").withStyle(net.minecraft.ChatFormatting.GOLD))
+                .append(lit(text).withStyle(net.minecraft.ChatFormatting.GRAY));
+    }
 }

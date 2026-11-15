@@ -617,7 +617,7 @@ public class PoteauxGame implements KLGame {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         GameConfig cfg = GameRegistry.config(ID);
         if (cfg == null) {
-            ctx.getSource().sendFailure(Component.literal("Config des poteaux introuvable."));
+            ctx.getSource().sendFailure(fr.cosmicisland.Txt.err("Config des poteaux introuvable."));
             return 0;
         }
         BlockPos pos = player.blockPosition();
@@ -629,7 +629,7 @@ public class PoteauxGame implements KLGame {
         cfg.settings.add("zonePos" + n, corner);
         GameRegistry.saveConfig(ID);
         String msg = "Coin " + n + " de la zone défini : " + pos.getX() + " " + pos.getY() + " " + pos.getZ();
-        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+        ctx.getSource().sendSuccess(() -> fr.cosmicisland.Txt.ok(msg), true);
         return 1;
     }
 
@@ -645,7 +645,7 @@ public class PoteauxGame implements KLGame {
     private int check(CommandContext<CommandSourceStack> ctx) {
         List<ServerPlayer> list = GameManager.onlineParticipants();
         if (list.isEmpty()) {
-            ctx.getSource().sendFailure(Component.literal(
+            ctx.getSource().sendFailure(fr.cosmicisland.Txt.err(
                     "Aucun participant : lance /ccis start poteaux et attends que les joueurs rejoignent."));
             return 0;
         }

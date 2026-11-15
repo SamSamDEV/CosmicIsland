@@ -28,10 +28,14 @@ public final class ConseilMenus {
         if (!ConseilManager.isCandidate(me)) {
             return "Tu ne participes pas à {v_au_conseil}.";
         }
+        if (!ConseilManager.canVote(me)) {
+            return "Tu es à égalité : tu ne votes pas à ce tour.";
+        }
         boolean self = ConseilManager.config().allowSelfVote;
         List<Map.Entry<UUID, String>> list = new ArrayList<>();
         for (Map.Entry<UUID, String> e : ConseilManager.candidates().entrySet()) {
-            if ((self || !e.getKey().equals(me)) && !ConseilManager.isTotemProtected(e.getKey())) {
+            if ((self || !e.getKey().equals(me)) && !ConseilManager.isTotemProtected(e.getKey())
+                    && ConseilManager.isTargetAllowed(e.getKey())) {
                 list.add(e);
             }
         }
