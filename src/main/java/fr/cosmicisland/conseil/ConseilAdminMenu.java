@@ -26,14 +26,14 @@ public final class ConseilAdminMenu {
     /** Ouvre le menu. Retourne un message d'erreur ou null. */
     public static String open(ServerPlayer player) {
         if (ConseilManager.phase() == ConseilManager.Phase.IDLE) {
-            return "Aucun conseil en cours (lance-en un avec /ccis conseil start <équipe>).";
+            return "{v_conseil} : rien en cours (lance-en un avec /ccis conseil start <équipe>).";
         }
         int count = ConseilManager.candidates().size();
         int rows = Math.max(2, Math.min(6, (count + 8) / 9 + 1));
         SimpleContainer container = new SimpleContainer(rows * 9);
         fill(container);
         List<UUID> order = new ArrayList<>(ConseilManager.candidates().keySet());
-        KLMenu.open(player, Txt.of("&6&lConseil &8- &7Organisation"), rows, container, "conseil-admin",
+        KLMenu.open(player, Txt.of("&6&l{v_conseil} &8- &7Organisation"), rows, container, "conseil-admin",
                 (p, slot) -> onClick(p, container, rows, order, slot));
         return null;
     }
@@ -87,7 +87,7 @@ public final class ConseilAdminMenu {
             lore.add("&7A voté : " + (ConseilManager.hasVoted(id) ? "&aoui" : "&cnon"));
             lore.add("&7Immunité : " + (immune ? "&a&lOUI" : "&cnon"));
             if (ConseilManager.hasCollier(id)) {
-                lore.add("&eA le collier d'immunité dans son inventaire");
+                lore.add("&eA {v_un_collier} dans son inventaire");
             }
             lore.add("");
             lore.add("&8Clic : activer ou retirer l'immunité");
@@ -100,7 +100,7 @@ public final class ConseilAdminMenu {
 
         int base = (rows - 1) * 9;
         ConseilManager.Phase phase = ConseilManager.phase();
-        container.setItem(base, MenuItems.named(Items.PAPER, "&6&lÉtat du conseil", List.of(
+        container.setItem(base, MenuItems.named(Items.PAPER, "&6&lÉtat {v_du_conseil}", List.of(
                 "&7Phase : &f" + ConseilManager.phaseLabel(),
                 "&7Tour : &f" + ConseilManager.round(),
                 "&7Votes reçus : &f" + ConseilManager.votesCount() + "&7/&f" + ConseilManager.candidates().size(),
@@ -110,15 +110,17 @@ public final class ConseilAdminMenu {
                 phase == ConseilManager.Phase.VOTING ? "&aDisponible" : "&8Indisponible")));
         container.setItem(base + 3, MenuItems.named(Items.NOTE_BLOCK, "&6&lLancer le reveal", List.of(
                 "&7Révèle les votes un par un (anonymes).",
-                phase == ConseilManager.Phase.CLOSED ? "&aDisponible" : "&8Indisponible")));
+                (phase == ConseilManager.Phase.CLOSED || phase == ConseilManager.Phase.COLLIER)
+                        ? "&aDisponible" + (phase == ConseilManager.Phase.COLLIER ? " &7(clic = passer le choix {v_du_collier})" : "")
+                        : "&8Indisponible")));
         container.setItem(base + 4, MenuItems.named(Items.CLOCK, "&b&lNouveau vote", List.of(
                 "&7Rouvre le vote (égalité ou aucun vote valide).",
                 (phase == ConseilManager.Phase.CLOSED || phase == ConseilManager.Phase.REVEALED)
                         ? "&aDisponible" : "&8Indisponible")));
-        container.setItem(base + 6, MenuItems.named(Items.EMERALD_BLOCK, "&a&lValider et clore le conseil", List.of(
+        container.setItem(base + 6, MenuItems.named(Items.EMERALD_BLOCK, "&a&lValider et clore {v_le_conseil}", List.of(
                 "&7L'éliminé part (spectateur), les autres retournent au camp.",
                 phase == ConseilManager.Phase.REVEALED ? "&aDisponible" : "&8Indisponible")));
-        container.setItem(base + 8, MenuItems.named(Items.BARRIER, "&4&lAnnuler le conseil", List.of(
+        container.setItem(base + 8, MenuItems.named(Items.BARRIER, "&4&lAnnuler {v_le_conseil}", List.of(
                 "&7Annule tout, sans éliminé.")));
     }
 }

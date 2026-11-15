@@ -170,7 +170,7 @@ public final class GameManager {
                 continue;
             }
             String team = TeamManager.teamIdOf(p.getUUID());
-            if (team == null || !c.allowedTeams.contains(team)) {
+            if (team == null || !fr.cosmicisland.TeamManager.listContains(c.allowedTeams, team)) {
                 continue;
             }
             if (SpawnManager.zoneSpawn(g.id(), team) == null) {
@@ -290,6 +290,21 @@ public final class GameManager {
         return null;
     }
 
+    /** Un joueur se connecte : s'il participe a l'epreuve en cours, il y reprend sa place. */
+    public static void onLogin(ServerPlayer player) {
+        if (game == null || state == State.IDLE || !joined.contains(player.getUUID())) {
+            return;
+        }
+        if (state == State.RUNNING || state == State.COUNTDOWN) {
+            player.sendSystemMessage(fr.cosmicisland.Txt.of("&a&lTu as rejoint l'épreuve en cours : &7bon courage !"));
+            try {
+                game.onRejoin(CONTEXT, player);
+            } catch (Exception e) {
+                CosmicIsland.LOGGER.error("Erreur dans onRejoin du jeu {}", game.id(), e);
+            }
+        }
+    }
+
     /** Termine l'epreuve, restaure les inventaires et renvoie les joueurs. */
     public static void finish(boolean cancelled) {
         if (state == State.IDLE || server == null) {
@@ -334,6 +349,12 @@ public final class GameManager {
 
         if (wasRunning) {
             RankingManager.record(g.id(), c, result, cancelled, durationSeconds, participantNames);
+            // Victoire a une epreuve solo : le vainqueur recoit un totem d'immunite (pose / cache a sa guise)
+            fr.cosmicisland.conseil.ConseilConfig cc = fr.cosmicisland.conseil.ConseilManager.config();
+            if (!cancelled && result != null && !result.teamMode && !result.winners.isEmpty() && cc.totemOnSoloWin
+                    && (!cc.totemOnlyWhenMerged || TeamManager.isMerged())) {
+                fr.cosmicisland.conseil.TotemManager.award(server, result.winners);
+            }
         }
         unfreeze();
         removeTimerBar();

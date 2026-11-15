@@ -3,6 +3,7 @@ package fr.cosmicisland.conseil;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mojang.authlib.GameProfile;
+import fr.cosmicisland.CosmicIsland;
 import fr.cosmicisland.KLFiles;
 import fr.cosmicisland.KLPermissions;
 import fr.cosmicisland.KLRole;
@@ -13,7 +14,9 @@ import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.SpawnManager;
 import fr.cosmicisland.gui.KLMenu;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerPlayer;
@@ -40,7 +43,7 @@ import java.util.UUID;
  */
 public final class ConseilManager {
 
-    public enum Phase { IDLE, VOTING, CLOSED, REVEALING, REVEALED }
+    public enum Phase { IDLE, VOTING, CLOSED, COLLIER, REVEALING, REVEALED }
 
     private record RevealItem(UUID voter, UUID target, boolean valid) {}
 
@@ -63,6 +66,10 @@ public final class ConseilManager {
     private static int revealIndex = 0;
     private static int revealTicks = 0;
     private static boolean finishing = false;
+    private static final Set<UUID> collierPending = new LinkedHashSet<>(); // porteurs de collier qui n'ont pas encore repondu
+    private static final Set<UUID> totemProtected = new LinkedHashSet<>();  // proteges par un totem (non votables)
+    private static int collierTicks = 0;
+    private static boolean collierUsed = false;
 
     private static int voteTicksLeft = -1;
     private static int voteTicksTotal = -1;
@@ -75,8 +82,31 @@ public final class ConseilManager {
 
     // ------------------------------------------------------------ cycle de vie
 
+    /** Anciens conseil.json : les mots en dur deviennent des termes du vocabulaire (vocabulary.json). */
+    private static String vocab(String s) {
+        if (s == null) {
+            return null;
+        }
+        return s.replace("collier d'immunité", "{v_collier}").replace("Collier d'immunité", "{v_collier}")
+                .replace("totem d'immunité", "{v_totem}").replace("TOTEM D'IMMUNITÉ", "{V_totem}")
+                .replace("UTILISER LE COLLIER", "UTILISER {V_le_collier}")
+                .replace("ton collier", "{v_le_collier}").replace("CONSEIL", "{V_conseil}")
+                .replace("prochain conseil", "prochain {v_conseil}");
+    }
+
+    private static void migrateVocabulary(ConseilConfig cfg) {
+        cfg.buttonCollierYes = vocab(cfg.buttonCollierYes);
+        if (cfg.messages != null) {
+            for (GameConfig.Msg msg : cfg.messages.values()) {
+                msg.text = vocab(msg.text);
+                msg.subtitle = vocab(msg.subtitle);
+            }
+        }
+    }
+
     public static void load() {
         config = KLFiles.load("conseil.json", ConseilConfig.class, ConseilConfig::new);
+        migrateVocabulary(config);
         // Anciens fichiers : les commandes /kl et /cmis ont ete renommees /ccis
         if (config.messages != null) {
             for (GameConfig.Msg msg : config.messages.values()) {
@@ -92,12 +122,14 @@ public final class ConseilManager {
 
     public static void init(MinecraftServer s) {
         server = s;
+        restoreState();
     }
 
+    /** Arret du serveur (ou fermeture du monde solo) : l'etat du conseil est sauvegarde et repris au prochain demarrage. */
     public static void shutdown() {
         if (server != null && phase != Phase.IDLE) {
-            writeLog("interrupted", null);
-            reset();
+            saveState();
+            resetMemory();
         }
         server = null;
     }
@@ -128,6 +160,10 @@ public final class ConseilManager {
         return votes.containsKey(voter);
     }
 
+    public static boolean isTotemProtected(UUID id) {
+        return totemProtected.contains(id);
+    }
+
     public static boolean isImmune(UUID id) {
         return immune.contains(id);
     }
@@ -153,9 +189,10 @@ public final class ConseilManager {
 
     public static String phaseLabel() {
         return switch (phase) {
-            case IDLE -> "aucun conseil";
+            case IDLE -> "{v_conseil} : rien en cours";
             case VOTING -> "vote en cours";
             case CLOSED -> "vote clos";
+            case COLLIER -> "choix {v_du_collier}";
             case REVEALING -> "dépouillement en cours";
             case REVEALED -> "résultat affiché (en attente de clôture)";
         };
@@ -206,18 +243,18 @@ public final class ConseilManager {
             return "Le serveur n'est pas prêt.";
         }
         if (phase != Phase.IDLE) {
-            return "Un conseil est déjà en cours (équipe " + teamName() + "). Utilise /ccis conseil cancel pour l'annuler.";
+            return "Il y a déjà {v_un_conseil} en cours (équipe " + teamName() + "). Utilise /ccis conseil cancel pour l'annuler.";
         }
         TeamManager.KLTeam t = TeamManager.get(team);
         if (t == null) {
-            return "Équipe inconnue : " + team + " (équipes : " + String.join(", ", TeamManager.ids()) + ")";
+            return "Équipe inconnue : " + team + " (équipes : " + String.join(", ", TeamManager.names()) + ")";
         }
         SpawnManager.Spawn council = SpawnManager.get("conseil");
         if (council == null) {
-            return "Spawn du conseil manquant : place-toi à l'endroit voulu et tape /ccis spawn set conseil.";
+            return "Spawn {v_du_conseil} manquant : place-toi à l'endroit voulu et tape /ccis spawn set conseil.";
         }
         if (SpawnManager.get("elimination") == null) {
-            return "Spawn d'élimination manquant : place-toi à l'endroit voulu et tape /ccis spawn set elimination.";
+            return "Spawn {v_du_elimination} manquant : place-toi à l'endroit voulu et tape /ccis spawn set elimination.";
         }
 
         Map<UUID, String> found = new LinkedHashMap<>();
@@ -257,8 +294,21 @@ public final class ConseilManager {
                 SpawnManager.teleport(server, p, council);
             }
         }
+        totemProtected.clear();
+        for (UUID id : candidates.keySet()) {
+            ServerPlayer p = online(id);
+            if (p != null && TotemManager.has(p)) {
+                totemProtected.add(id);
+                immune.add(id);
+            }
+        }
         startVoting();
-        notifyStaff("Conseil lancé pour l'équipe &f" + t.name + "&7 (&f" + candidates.size()
+        for (UUID id : totemProtected) {
+            for (ServerPlayer p : audience()) {
+                ConseilMessages.send(config.message("totemProtected"), p, Map.of("nom", candidates.get(id)));
+            }
+        }
+        notifyStaff("{v_conseil} lancé pour l'équipe &f" + t.name + "&7 (&f" + candidates.size()
                 + "&7 participants). Suis le déroulé avec &f/ccis conseil menu&7.");
         return null;
     }
@@ -285,6 +335,7 @@ public final class ConseilManager {
         }
         castFakeVotes();
         updateBar();
+        saveState();
         refreshAdminMenus();
     }
 
@@ -317,13 +368,16 @@ public final class ConseilManager {
         }
         UUID id = voter.getUUID();
         if (!candidates.containsKey(id)) {
-            return "Tu ne participes pas à ce conseil.";
+            return "Tu ne participes pas à {v_au_conseil}.";
         }
         if (!candidates.containsKey(target)) {
             return "Ce joueur ne peut pas être voté.";
         }
         if (id.equals(target) && !config.allowSelfVote) {
             return "Tu ne peux pas voter pour toi-même.";
+        }
+        if (totemProtected.contains(target)) {
+            return "Ce joueur est protégé par un {v_totem} : il ne peut pas être voté.";
         }
         boolean first = !votes.containsKey(id);
         votes.put(id, target);
@@ -333,6 +387,7 @@ public final class ConseilManager {
         if (votes.size() >= candidates.size()) {
             notifyStaff("Tout le monde a voté : clos le vote avec &f/ccis conseil vote close&7 ou le menu.");
         }
+        saveState();
         refreshAdminMenus();
         return null;
     }
@@ -340,7 +395,7 @@ public final class ConseilManager {
     /** Cloture le vote (aucun vote supplementaire possible). */
     public static String closeVote() {
         if (phase != Phase.VOTING) {
-            return phase == Phase.IDLE ? "Aucun conseil en cours." : "Le vote est déjà clos.";
+            return phase == Phase.IDLE ? "{v_conseil} : rien en cours." : "Le vote est déjà clos.";
         }
         phase = Phase.CLOSED;
         removeBar();
@@ -352,7 +407,8 @@ public final class ConseilManager {
             }
         }
         notifyStaff("Vote clos : &f" + votes.size() + "&7/&f" + candidates.size()
-                + "&7 votes reçus. Marque les immunités puis lance &f/ccis conseil reveal&7.");
+                + "&7 votes reçus. Lance &f/ccis conseil reveal&7 : les porteurs {v_du_collier} seront interrogés avant le dépouillement.");
+        saveState();
         refreshAdminMenus();
         return null;
     }
@@ -362,13 +418,16 @@ public final class ConseilManager {
     /** Active ou retire l'immunite d'un joueur (possible avant le debut du depouillement). */
     public static String toggleImmune(UUID id) {
         if (phase == Phase.IDLE) {
-            return "Aucun conseil en cours.";
+            return "{v_conseil} : rien en cours.";
         }
         if (phase != Phase.VOTING && phase != Phase.CLOSED) {
             return "Trop tard : le dépouillement a commencé.";
         }
         if (!candidates.containsKey(id)) {
-            return "Ce joueur ne fait pas partie du conseil.";
+            return "Ce joueur ne fait pas partie {v_du_conseil}.";
+        }
+        if (totemProtected.contains(id)) {
+            return "Ce joueur est protégé par {v_un_totem} : son immunité ne se modifie pas.";
         }
         boolean now;
         if (immune.contains(id)) {
@@ -379,6 +438,7 @@ public final class ConseilManager {
             now = true;
         }
         notifyStaff("Immunité de &f" + candidates.get(id) + "&7 : " + (now ? "&aOUI" : "&cNON"));
+        saveState();
         refreshAdminMenus();
         return null;
     }
@@ -387,17 +447,31 @@ public final class ConseilManager {
 
     public static String reveal() {
         if (phase == Phase.IDLE) {
-            return "Aucun conseil en cours.";
+            return "{v_conseil} : rien en cours.";
         }
         if (phase == Phase.VOTING) {
             return "Clos d'abord le vote (/ccis conseil vote close).";
         }
+        if (phase == Phase.COLLIER) {
+            collierPending.clear(); // l'organisateur passe l'etape du collier
+            beginReveal();
+            return null;
+        }
         if (phase != Phase.CLOSED) {
             return "Le dépouillement a déjà eu lieu (utilise /ccis conseil revote ou /ccis conseil close).";
         }
+        if (config.collierPromptSeconds > 0 && startCollierPhase()) {
+            return null;
+        }
+        beginReveal();
+        return null;
+    }
+
+    /** Lance le depouillement. Tous les votes sont comptes ; un immunise ne peut simplement pas etre elimine. */
+    private static void beginReveal() {
         List<RevealItem> items = new ArrayList<>();
         for (Map.Entry<UUID, UUID> e : votes.entrySet()) {
-            items.add(new RevealItem(e.getKey(), e.getValue(), !immune.contains(e.getValue())));
+            items.add(new RevealItem(e.getKey(), e.getValue(), true));
         }
         Collections.shuffle(items);
         tally.clear();
@@ -413,8 +487,91 @@ public final class ConseilManager {
             ConseilMessages.send(config.message("revealStart"), p, Map.of("equipe", teamName()));
         }
         sendTally(true);
+        saveState();
+        refreshAdminMenus();
+    }
+
+    // ------------------------------------------------------------ collier : choix avant le depouillement
+
+    /** Interroge chaque porteur de collier (en ligne). Retourne false s'il n'y en a aucun. */
+    private static boolean startCollierPhase() {
+        collierPending.clear();
+        collierUsed = false;
+        for (UUID id : candidates.keySet()) {
+            ServerPlayer p = online(id);
+            if (p != null && !immune.contains(id) && TotemManager.hasCollier(p)) {
+                collierPending.add(id);
+            }
+        }
+        if (collierPending.isEmpty()) {
+            return false;
+        }
+        phase = Phase.COLLIER;
+        collierTicks = config.collierPromptSeconds * 20;
+        for (UUID id : collierPending) {
+            ServerPlayer p = online(id);
+            if (p == null) {
+                continue;
+            }
+            Component yes = Txt.of("&a&l" + config.buttonCollierYes).withStyle(style -> style
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ccis collier oui"))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                            Txt.of("&7Tu révèles ton immunité : les votes contre toi ne pourront pas t'éliminer."))));
+            Component no = Txt.of("&c&l" + config.buttonCollierNo).withStyle(style -> style
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ccis collier non"))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Txt.of("&7Tu gardes {v_le_collier}."))));
+            ConseilMessages.send(config.message("collierPrompt"), p, Map.of());
+            p.sendSystemMessage(Component.empty().append(yes).append(Txt.lit("   ")).append(no));
+        }
+        notifyStaff("Porteurs de collier interrogés (&f" + collierPending.size() + "&7) : le dépouillement commence "
+                + "après leur réponse (max &f" + config.collierPromptSeconds + "s&7). Relance &f/ccis conseil reveal&7 pour passer.");
+        saveState();
+        refreshAdminMenus();
+        return true;
+    }
+
+    /** Reponse d'un joueur au choix du collier (clic dans le chat). */
+    public static String answerCollier(ServerPlayer player, boolean use) {
+        UUID id = player.getUUID();
+        if (phase != Phase.COLLIER || !collierPending.contains(id)) {
+            return "Aucun choix en attente pour toi.";
+        }
+        collierPending.remove(id);
+        String name = candidates.getOrDefault(id, player.getGameProfile().getName());
+        if (use) {
+            if (config.collierConsume && !TotemManager.consumeCollier(player)) {
+                return "Tu n'as plus de {v_collier}.";
+            }
+            immune.add(id);
+            collierUsed = true;
+            for (ServerPlayer p : audience()) {
+                ConseilMessages.send(config.message("collierRevealed"), p, Map.of("nom", name));
+            }
+            notifyStaff("&f" + name + "&7 utilise {v_le_collier} : &eimmunisé&7.");
+        } else {
+            ConseilMessages.send(config.message("collierKept"), player, Map.of());
+            notifyStaff("&f" + name + "&7 garde {v_le_collier}.");
+        }
+        if (collierPending.isEmpty()) {
+            // laisse le temps de lire l'annonce avant le titre du depouillement
+            collierTicks = collierUsed ? 100 : 1;
+        }
+        saveState();
         refreshAdminMenus();
         return null;
+    }
+
+    private static void tickCollier() {
+        if (collierTicks > 0) {
+            collierTicks--;
+        }
+        if (collierTicks <= 0) {
+            if (!collierPending.isEmpty()) {
+                notifyStaff("Temps écoulé : &f" + collierPending.size() + "&7 porteur(s) {v_du_collier} n'ont pas répondu (collier gardé).");
+                collierPending.clear();
+            }
+            beginReveal();
+        }
     }
 
     private static void revealStep() {
@@ -436,7 +593,7 @@ public final class ConseilManager {
                 "cible", target,
                 "n", String.valueOf(revealIndex),
                 "total", String.valueOf(queue.size()));
-        GameConfig.Msg msg = config.message(item.valid() ? "revealVote" : "revealVoid");
+        GameConfig.Msg msg = config.message(immune.contains(item.target()) ? "revealImmune" : "revealVote");
         for (ServerPlayer p : audience()) {
             ConseilMessages.send(msg, p, vars);
         }
@@ -450,7 +607,16 @@ public final class ConseilManager {
     private static void finalizeResult() {
         int best = 0;
         List<UUID> leaders = new ArrayList<>();
+        int overall = 0;
+        UUID overallLeader = null;
         for (Map.Entry<UUID, Integer> e : tally.entrySet()) {
+            if (e.getValue() > overall) {
+                overall = e.getValue();
+                overallLeader = e.getKey();
+            }
+            if (immune.contains(e.getKey())) {
+                continue; // un immunise compte les votes mais ne peut pas etre elimine
+            }
             if (e.getValue() > best) {
                 best = e.getValue();
                 leaders.clear();
@@ -471,6 +637,11 @@ public final class ConseilManager {
         }
         phase = Phase.REVEALED;
         recordRound(false);
+        if (overallLeader != null && immune.contains(overallLeader) && eliminated != null) {
+            notifyStaff("&f" + candidates.getOrDefault(overallLeader, "?") + "&7 avait le plus de votes (" + overall
+                    + ") mais est immunisé : le suivant est éliminé.");
+        }
+        saveState();
 
         String key = lastResult;
         String name = eliminated == null ? "" : candidates.getOrDefault(eliminated, "?");
@@ -492,7 +663,7 @@ public final class ConseilManager {
 
     public static String revote() {
         if (phase == Phase.IDLE) {
-            return "Aucun conseil en cours.";
+            return "{v_conseil} : rien en cours.";
         }
         if (phase != Phase.CLOSED && phase != Phase.REVEALED) {
             return "Impossible pendant le vote ou le dépouillement.";
@@ -511,7 +682,7 @@ public final class ConseilManager {
     /** Valide le resultat : l'elimine part (spectateur + point d'elimination), les autres retournent au camp. */
     public static String close() {
         if (phase == Phase.IDLE) {
-            return "Aucun conseil en cours.";
+            return "{v_conseil} : rien en cours.";
         }
         if (phase != Phase.REVEALED) {
             return "Le dépouillement n'est pas terminé (étapes : vote close, reveal, puis close).";
@@ -551,8 +722,16 @@ public final class ConseilManager {
                 }
             }
         }
+        if (!test && config.totemConsumeAtClose) {
+            for (UUID id : totemProtected) {
+                ServerPlayer holder = online(id);
+                if (holder != null) {
+                    TotemManager.consume(holder);
+                }
+            }
+        }
         writeLog("closed", outName);
-        notifyStaff("Conseil clos : &f" + outName + (test
+        notifyStaff("{v_conseil} clos : &f" + outName + (test
                 ? "&7 est éliminé (TEST : aucun rôle modifié)."
                 : "&7 est éliminé (passé en spectateur)."));
         reset();
@@ -561,7 +740,7 @@ public final class ConseilManager {
 
     public static String cancel() {
         if (phase == Phase.IDLE) {
-            return "Aucun conseil en cours.";
+            return "{v_conseil} : rien en cours.";
         }
         SpawnManager.Spawn camp = teamId == null ? null : SpawnManager.baseSpawn(teamId);
         for (UUID id : candidates.keySet()) {
@@ -574,13 +753,22 @@ public final class ConseilManager {
             }
         }
         writeLog("cancelled", null);
-        notifyStaff("Conseil annulé.");
+        notifyStaff("{v_conseil} annulé.");
         reset();
         return null;
     }
 
     private static void reset() {
+        resetMemory();
+        deleteState();
+    }
+
+    private static void resetMemory() {
         sendTally(false);
+        collierPending.clear();
+        totemProtected.clear();
+        collierTicks = 0;
+        collierUsed = false;
         removeBar();
         phase = Phase.IDLE;
         teamId = null;
@@ -620,6 +808,10 @@ public final class ConseilManager {
                 updateBar();
             }
             refreshAdminMenus();
+        }
+        if (phase == Phase.COLLIER) {
+            tickCollier();
+            return;
         }
         if (phase == Phase.REVEALING) {
             revealTicks--;
@@ -745,6 +937,7 @@ public final class ConseilManager {
                 o.addProperty("votant", candidates.getOrDefault(item.voter(), "?"));
                 o.addProperty("cible", candidates.getOrDefault(item.target(), "?"));
                 o.addProperty("valide", item.valid());
+                o.addProperty("cible_immunisee", immune.contains(item.target()));
                 list.add(o);
             }
             JsonObject counts = new JsonObject();
@@ -802,6 +995,142 @@ public final class ConseilManager {
         KLFiles.save("log_conseil/conseil_" + stamp + "_" + (teamId == null ? "equipe" : teamId) + ".json", o);
     }
 
+    // ------------------------------------------------------------ sauvegarde de l'etat (redemarrage serveur / monde solo)
+
+    private static class SavedState {
+        String phase = "IDLE";
+        String teamId;
+        String startedAt = "";
+        int round = 1;
+        int voteTicksLeft = -1;
+        int voteTicksTotal = -1;
+        String eliminated;
+        String lastResult = "";
+        Map<String, String> candidates = new LinkedHashMap<>();
+        Map<String, String> votes = new LinkedHashMap<>();
+        List<String> immune = new ArrayList<>();
+        List<String> totem = new ArrayList<>();
+        Map<String, Integer> tally = new LinkedHashMap<>();
+        List<String> rounds = new ArrayList<>();
+    }
+
+    private static final String STATE_FILE = "state/conseil.json";
+
+    private static java.nio.file.Path stateFile() {
+        return KLFiles.dir().resolve(STATE_FILE);
+    }
+
+    private static void deleteState() {
+        try {
+            java.nio.file.Files.deleteIfExists(stateFile());
+        } catch (java.io.IOException ignored) {
+            // pas bloquant
+        }
+    }
+
+    /** Ecrit l'etat courant. Les conseils de test (joueurs fictifs) ne sont jamais sauvegardes. */
+    private static void saveState() {
+        if (phase == Phase.IDLE || !fakes.isEmpty() || server == null) {
+            return;
+        }
+        SavedState st = new SavedState();
+        // le depouillement recommence a zero apres un redemarrage
+        st.phase = (phase == Phase.COLLIER || phase == Phase.REVEALING) ? Phase.CLOSED.name() : phase.name();
+        st.teamId = teamId;
+        st.startedAt = startedAt;
+        st.round = round;
+        st.voteTicksLeft = voteTicksLeft;
+        st.voteTicksTotal = voteTicksTotal;
+        st.eliminated = eliminated == null ? null : eliminated.toString();
+        st.lastResult = lastResult;
+        for (Map.Entry<UUID, String> e : candidates.entrySet()) {
+            st.candidates.put(e.getKey().toString(), e.getValue());
+        }
+        for (Map.Entry<UUID, UUID> e : votes.entrySet()) {
+            st.votes.put(e.getKey().toString(), e.getValue().toString());
+        }
+        for (UUID id : immune) {
+            st.immune.add(id.toString());
+        }
+        for (UUID id : totemProtected) {
+            st.totem.add(id.toString());
+        }
+        if (phase == Phase.REVEALED) {
+            for (Map.Entry<UUID, Integer> e : tally.entrySet()) {
+                st.tally.put(e.getKey().toString(), e.getValue());
+            }
+        }
+        for (JsonObject r : rounds) {
+            st.rounds.add(r.toString());
+        }
+        KLFiles.save(STATE_FILE, st);
+    }
+
+    private static void restoreState() {
+        if (!java.nio.file.Files.exists(stateFile())) {
+            return;
+        }
+        SavedState st = KLFiles.load(STATE_FILE, SavedState.class, SavedState::new);
+        try {
+            Phase restored = Phase.valueOf(st.phase);
+            if (restored == Phase.IDLE || st.candidates.isEmpty()) {
+                return;
+            }
+            resetMemory();
+            phase = restored;
+            teamId = st.teamId;
+            startedAt = st.startedAt == null ? "" : st.startedAt;
+            round = Math.max(1, st.round);
+            voteTicksLeft = st.voteTicksLeft;
+            voteTicksTotal = st.voteTicksTotal;
+            lastResult = st.lastResult == null ? "" : st.lastResult;
+            eliminated = st.eliminated == null ? null : UUID.fromString(st.eliminated);
+            for (Map.Entry<String, String> e : st.candidates.entrySet()) {
+                candidates.put(UUID.fromString(e.getKey()), e.getValue());
+            }
+            for (Map.Entry<String, String> e : st.votes.entrySet()) {
+                votes.put(UUID.fromString(e.getKey()), UUID.fromString(e.getValue()));
+            }
+            for (String id : st.immune) {
+                immune.add(UUID.fromString(id));
+            }
+            for (String id : st.totem) {
+                totemProtected.add(UUID.fromString(id));
+            }
+            for (Map.Entry<String, Integer> e : st.tally.entrySet()) {
+                tally.put(UUID.fromString(e.getKey()), e.getValue());
+            }
+            for (String r : st.rounds) {
+                rounds.add(com.google.gson.JsonParser.parseString(r).getAsJsonObject());
+            }
+            CosmicIsland.LOGGER.info("{v_conseil} restaure apres redemarrage : equipe {}, phase {}", teamId, phase);
+        } catch (Exception e) {
+            CosmicIsland.LOGGER.error("Etat {v_du_conseil} illisible : ignore", e);
+            resetMemory();
+        }
+    }
+
+    /** Connexion d'un joueur : reprise du conseil restaure (vote, barre, decompte) ou information du staff. */
+    public static void onLogin(ServerPlayer player) {
+        if (phase == Phase.IDLE) {
+            return;
+        }
+        if (KLPermissions.levelOf(player) >= KLPermissions.ORGANISATEUR) {
+            player.sendSystemMessage(Component.empty()
+                    .append(Txt.lit("[{v_conseil}] ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
+                    .append(Txt.of("&7{v_conseil} en cours (équipe &f" + teamName() + "&7, " + phaseLabel()
+                            + "). Suis-le avec &f/ccis conseil menu&7.")));
+        }
+        if (candidates.containsKey(player.getUUID())) {
+            if (phase == Phase.VOTING) {
+                ConseilMessages.send(config.message("voteStart"), player, Map.of("equipe", teamName()));
+            }
+            if (phase == Phase.REVEALED) {
+                sendTally(true);
+            }
+        }
+    }
+
     // ------------------------------------------------------------ utilitaires
 
     private static ServerPlayer online(UUID id) {
@@ -822,7 +1151,7 @@ public final class ConseilManager {
             return;
         }
         Component msg = Component.empty()
-                .append(Component.literal("[Conseil] ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
+                .append(Txt.lit("[{v_conseil}] ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
                 .append(Txt.of(text).withStyle(ChatFormatting.GRAY));
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (KLPermissions.levelOf(p) >= KLPermissions.ORGANISATEUR) {
@@ -834,9 +1163,9 @@ public final class ConseilManager {
 
     public static List<Component> statusLines() {
         List<Component> out = new ArrayList<>();
-        out.add(Component.literal("=== Conseil ===").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        out.add(Txt.lit("=== {v_conseil} ===").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
         if (phase == Phase.IDLE) {
-            out.add(Component.literal("Aucun conseil en cours.").withStyle(ChatFormatting.GRAY));
+            out.add(Txt.lit("{v_conseil} : rien en cours.").withStyle(ChatFormatting.GRAY));
             return out;
         }
         out.add(row("Équipe", teamName()));
@@ -856,7 +1185,7 @@ public final class ConseilManager {
 
     private static Component row(String label, String value) {
         return Component.empty()
-                .append(Component.literal(label + " : ").withStyle(ChatFormatting.GRAY, ChatFormatting.BOLD))
-                .append(Component.literal(value).withStyle(ChatFormatting.WHITE));
+                .append(Txt.lit(label + " : ").withStyle(ChatFormatting.GRAY, ChatFormatting.BOLD))
+                .append(Txt.lit(value).withStyle(ChatFormatting.WHITE));
     }
 }

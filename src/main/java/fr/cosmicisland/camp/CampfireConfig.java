@@ -30,6 +30,17 @@ public class CampfireConfig {
     public double debuffBelow = 0.0;         // le malus s'applique quand le feu est a ce niveau ou moins (0 = eteint)
     public boolean showBar = true;           // barre de jauge visible pour l'equipe
     public double warnBelowPercent = 20.0;   // avertissement quand le feu passe sous ce pourcentage
+    public boolean requireLit = true;        // le feu doit etre ALLUME (briquet...) : sinon malus, et la jauge ne baisse pas
+    public boolean extinguishAtZero = true;  // eteint le bloc quand la jauge tombe a 0 (jamais rallume de force)
+    public boolean forceLit = false;         // true = le mod rallume lui-meme le bloc quand la jauge > 0 (deconseille avec Unlit Campfire)
+    public boolean autoRegister = true;      // un joueur d'une equipe SANS feu pose un campfire : il devient le feu de l'equipe
+    public double zoneRadius = 500.0;        // rayon (en blocs, a plat) de la zone de base autour du feu
+    public String zoneMessages = "staff";    // qui recoit "vous entrez dans la zone" : staff | all | none
+    public boolean teamBonuses = true;       // bonus / malus de faim selon la jauge du feu de l'equipe
+    public double bonusAbovePercent = 90.0;  // au-dessus : bonus
+    public double bonusHungerReductionPercent = 15.0; // -15 % de faim
+    public double malusBelowPercent = 30.0;  // en dessous : malus
+    public double malusHungerIncreasePercent = 10.0;  // +10 % de faim
     public boolean applyEffects = true;      // appliquer les effets de potion pendant les epreuves
     public List<EffectEntry> debuffEffects = new ArrayList<>(List.of(
             new EffectEntry("minecraft:weakness", 0),
@@ -75,6 +86,17 @@ public class CampfireConfig {
                 "minecraft:block.note_block.bass"));
         m.put("out", msg("&c&lLE FEU S'EST ÉTEINT", "&7Malus pendant les épreuves !", "title",
                 "minecraft:block.fire.extinguish"));
+        m.put("unlit", msg("&e&lLe feu n'est pas allumé !", "&7Allumez-le (briquet) pour éviter le malus", "title",
+                "minecraft:block.fire.extinguish"));
+        m.put("registered", msg("&6&lFeu de camp créé !", "&7Allumez-le (briquet) - zone de base : {radius} blocs", "title",
+                "minecraft:block.campfire.crackle"));
+        m.put("zoneEnter", msg("&e➤ Vous entrez dans la zone {tag}&e {team}", "", "actionbar", ""));
+        m.put("zoneLeave", msg("&7➤ Vous quittez la zone {team}", "", "actionbar", ""));
+        m.put("tierHigh", msg("&a&lLe feu rayonne !", "&7Bonus : moins de faim", "title", "minecraft:block.beacon.activate"));
+        m.put("tierLow", msg("&c&lLe feu faiblit fortement", "&7Malus : plus de faim ({percent}%)", "title",
+                "minecraft:block.beacon.deactivate"));
+        m.put("tierNormal", msg("&7Le feu est revenu à un niveau normal ({percent}%)", "", "actionbar", ""));
+        m.put("crafted", msg("&7Feu de camp fabriqué : posez-le au sol, puis allumez-le !", "", "actionbar", ""));
         m.put("reignited", msg("&a&lLe feu reprend !", "&7Le malus est levé", "title",
                 "minecraft:item.flintandsteel.use"));
         return m;

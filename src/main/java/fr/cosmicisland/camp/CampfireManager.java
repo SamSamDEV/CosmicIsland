@@ -20,11 +20,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.BossEvent;
+import net.minecraft.world.food.FoodData;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
@@ -34,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Feu de camp de chaque equipe : un bloc "campfire" place dans le monde, suivi par une jauge de carburant.
@@ -62,6 +65,10 @@ public final class CampfireManager {
     private static final Map<String, ServerBossEvent> bars = new HashMap<>();
     private static final Set<String> out = new HashSet<>();     // equipes dont le feu est eteint
     private static final Set<String> warned = new HashSet<>();  // equipes deja prevenues que le feu faiblit
+    private static final Set<String> unlit = new HashSet<>();   // equipes dont le bloc est eteint / absent
+    private static final Map<String, Integer> tiers = new HashMap<>();      // equipe -> -1 malus / 0 normal / 1 bonus
+    private static final Map<UUID, String> zoneOf = new HashMap<>();         // joueur -> equipe dont il est dans la zone
+    private static final Map<UUID, Float> lastExhaust = new HashMap<>();
     private static boolean dirty = false;
     private static int saveSeconds = 0;
 
@@ -127,7 +134,7 @@ public final class CampfireManager {
             return false;
         }
         Fire f = get(team);
-        return f != null && f.fuel <= config.debuffBelow;
+        return f != null && (f.fuel <= config.debuffBelow || (config.requireLit && unlit.contains(team)));
     }
 
     // ------------------------------------------------------------ gestion (commandes et menu)
@@ -144,8 +151,10 @@ public final class CampfireManager {
         store.fires.put(key, f);
         out.remove(key);
         warned.remove(key);
+        tiers.remove(key);
         save();
         refresh(key, f);
+        sendToTeam(key, "registered", percent(f));
     }
 
     public static boolean remove(String team) {
@@ -155,6 +164,8 @@ public final class CampfireManager {
         }
         out.remove(key);
         warned.remove(key);
+        unlit.remove(key);
+        tiers.remove(key);
         ServerBossEvent bar = bars.remove(key);
         if (bar != null) {
             bar.removeAllPlayers();
@@ -190,8 +201,8 @@ public final class CampfireManager {
         if (server == null) {
             return;
         }
+        updateLit(team, f);
         transitions(team, f);
-        updateLit(f);
         updateBar(team, f);
     }
 
@@ -264,14 +275,17 @@ public final class CampfireManager {
         for (Map.Entry<String, Fire> e : new ArrayList<>(store.fires.entrySet())) {
             String team = e.getKey();
             Fire f = e.getValue();
-            if (f.fuel > 0.0) {
+            updateLit(team, f);
+            boolean burning = !config.requireLit || !unlit.contains(team);
+            if (f.fuel > 0.0 && burning) {
                 f.fuel = Math.max(0.0, f.fuel - config.drainPerMinute / 60.0);
                 dirty = true;
             }
+            updateLit(team, f);
             transitions(team, f);
-            updateLit(f);
             updateBar(team, f);
         }
+        playersTick();
         saveSeconds++;
         if (dirty && saveSeconds >= 30) {
             saveSeconds = 0;
@@ -281,11 +295,13 @@ public final class CampfireManager {
 
     /** Messages quand le feu faiblit, s'eteint ou reprend. */
     private static void transitions(String team, Fire f) {
-        boolean isOut = f.fuel <= 0.0;
+        boolean noFuel = f.fuel <= 0.0;
+        boolean dark = config.requireLit && unlit.contains(team);
+        boolean isOut = noFuel || dark;
         int pct = percent(f);
         if (isOut && !out.contains(team)) {
             out.add(team);
-            sendToTeam(team, "out", pct);
+            sendToTeam(team, noFuel ? "out" : "unlit", pct);
         } else if (!isOut && out.contains(team)) {
             out.remove(team);
             sendToTeam(team, "reignited", pct);
@@ -297,33 +313,188 @@ public final class CampfireManager {
         } else if (pct > config.warnBelowPercent) {
             warned.remove(team);
         }
+        int tier = tierOf(f);
+        Integer prev = tiers.put(team, tier);
+        if (prev != null && prev != tier && config.teamBonuses && !(tier < 0 && isOut)) {
+            sendToTeam(team, tier > 0 ? "tierHigh" : tier < 0 ? "tierLow" : "tierNormal", pct);
+        }
+    }
+
+    private static int tierOf(Fire f) {
+        int pct = percent(f);
+        if (pct >= config.bonusAbovePercent) {
+            return 1;
+        }
+        return pct < config.malusBelowPercent ? -1 : 0;
     }
 
     private static void sendToTeam(String team, String key, int pct) {
         GameConfig.Msg msg = config.message(key);
+        TeamManager.KLTeam kt = TeamManager.get(team);
+        Map<String, String> vars = Map.of("percent", String.valueOf(pct),
+                "radius", String.format("%.0f", config.zoneRadius),
+                "team", kt == null ? team : kt.name, "tag", kt == null ? "" : kt.tag);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (team.equals(TeamManager.teamIdOf(p.getUUID()))) {
-                ConseilMessages.send(msg, p, Map.of("percent", String.valueOf(pct)));
+                ConseilMessages.send(msg, p, vars);
             }
         }
     }
 
-    /** Allume ou eteint le bloc campfire selon la jauge. */
-    private static void updateLit(Fire f) {
+    /** Un bloc est-il un feu de camp (vanilla ou d'un mod : Build Your Campfire, etc.) ? */
+    public static boolean isCampfireLike(BlockState state) {
+        if (state.getBlock() instanceof CampfireBlock) {
+            return true;
+        }
+        ResourceLocation key = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        return key != null && (key.getPath().contains("campfire") || key.getPath().contains("bonfire"))
+                && state.hasProperty(BlockStateProperties.LIT);
+    }
+
+    /**
+     * Observe l'etat reel du bloc (les joueurs l'allument eux-memes ; la pluie ou d'autres mods peuvent l'eteindre).
+     * Ne rallume jamais de force sauf si forceLit est active.
+     */
+    private static void updateLit(String team, Fire f) {
         ServerLevel level = SpawnManager.level(server, f.dimension);
         if (level == null) {
             return;
         }
         BlockPos pos = new BlockPos(f.x, f.y, f.z);
         if (!level.isLoaded(pos)) {
-            return;
+            return; // chunk dechage : on garde le dernier etat connu
         }
         BlockState state = level.getBlockState(pos);
-        if (state.getBlock() instanceof CampfireBlock && state.hasProperty(CampfireBlock.LIT)) {
-            boolean lit = f.fuel > 0.0;
-            if (state.getValue(CampfireBlock.LIT) != lit) {
-                level.setBlock(pos, state.setValue(CampfireBlock.LIT, lit), 3);
+        if (!isCampfireLike(state)) {
+            unlit.add(team); // bloc casse ou absent
+            return;
+        }
+        if (state.hasProperty(BlockStateProperties.LIT)) {
+            boolean lit = state.getValue(BlockStateProperties.LIT);
+            if (config.extinguishAtZero && f.fuel <= 0.0 && lit) {
+                level.setBlock(pos, state.setValue(BlockStateProperties.LIT, false), 3);
+                lit = false;
+            } else if (config.forceLit && f.fuel > 0.0 && !lit) {
+                level.setBlock(pos, state.setValue(BlockStateProperties.LIT, true), 3);
+                lit = true;
             }
+            if (lit) {
+                unlit.remove(team);
+            } else {
+                unlit.add(team);
+            }
+        } else {
+            unlit.remove(team);
+        }
+    }
+
+    // ------------------------------------------------------------ zones de base et bonus d'equipe
+
+    /** Equipe dont la zone (cercle autour du feu) contient le joueur, ou null. */
+    private static String zoneAt(ServerPlayer p) {
+        String dimension = p.level().dimension().location().toString();
+        String best = null;
+        double bestDist = config.zoneRadius * config.zoneRadius;
+        for (Map.Entry<String, Fire> e : store.fires.entrySet()) {
+            Fire f = e.getValue();
+            if (!f.dimension.equals(dimension)) {
+                continue;
+            }
+            double dx = p.getX() - (f.x + 0.5);
+            double dz = p.getZ() - (f.z + 0.5);
+            double d = dx * dx + dz * dz;
+            if (d <= bestDist) {
+                bestDist = d;
+                best = e.getKey();
+            }
+        }
+        return best;
+    }
+
+    private static void playersTick() {
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            String zone = zoneAt(p);
+            String prev = zoneOf.get(p.getUUID());
+            if (!java.util.Objects.equals(zone, prev)) {
+                if (zone == null) {
+                    zoneOf.remove(p.getUUID());
+                } else {
+                    zoneOf.put(p.getUUID(), zone);
+                }
+                notifyZone(p, prev, zone);
+            }
+            applyHunger(p);
+        }
+    }
+
+    private static void notifyZone(ServerPlayer p, String prev, String now) {
+        String mode = config.zoneMessages == null ? "staff" : config.zoneMessages.toLowerCase();
+        if (mode.equals("none") || (mode.equals("staff") && KLPermissions.levelOf(p) < KLPermissions.ORGANISATEUR)) {
+            return;
+        }
+        if (prev != null) {
+            ConseilMessages.send(config.message("zoneLeave"), p, zoneVars(prev));
+        }
+        if (now != null) {
+            ConseilMessages.send(config.message("zoneEnter"), p, zoneVars(now));
+        }
+    }
+
+    private static Map<String, String> zoneVars(String team) {
+        TeamManager.KLTeam kt = TeamManager.get(team);
+        return Map.of("team", kt == null ? team : kt.name, "tag", kt == null ? "" : kt.tag,
+                "radius", String.format("%.0f", config.zoneRadius));
+    }
+
+    /** Bonus (-15 % de faim au-dessus de 90 %) ou malus (+10 % sous 30 %) selon la jauge du feu de l'equipe. */
+    private static void applyHunger(ServerPlayer p) {
+        Fire f = config.teamBonuses ? get(TeamManager.teamIdOf(p.getUUID())) : null;
+        if (f == null || p.isSpectator() || p.isCreative()) {
+            lastExhaust.remove(p.getUUID());
+            return;
+        }
+        int tier = tierOf(f);
+        double factor = tier > 0 ? -config.bonusHungerReductionPercent / 100.0
+                : tier < 0 ? config.malusHungerIncreasePercent / 100.0 : 0.0;
+        FoodData food = p.getFoodData();
+        float cur = food.getExhaustionLevel();
+        Float last = lastExhaust.get(p.getUUID());
+        if (last != null && factor != 0.0) {
+            float delta = cur - last;
+            if (delta > 0.0f) {
+                cur = Math.max(0.0f, cur + (float) (delta * factor));
+                food.setExhaustion(cur);
+            }
+        }
+        lastExhaust.put(p.getUUID(), cur);
+    }
+
+    // ------------------------------------------------------------ pose / fabrication par les joueurs
+
+    /** Un joueur pose un feu de camp : s'il est dans une equipe sans feu valide, ce feu devient celui de l'equipe. */
+    public static void onPlaced(ServerPlayer player, ServerLevel level, BlockPos pos, BlockState state) {
+        if (!config.enabled || !config.autoRegister || server == null || !isCampfireLike(state)) {
+            return;
+        }
+        String team = TeamManager.teamIdOf(player.getUUID());
+        if (team == null || GameManager.isInGame(player.getUUID())) {
+            return;
+        }
+        Fire existing = get(team);
+        if (existing != null) {
+            ServerLevel old = SpawnManager.level(server, existing.dimension);
+            BlockPos oldPos = new BlockPos(existing.x, existing.y, existing.z);
+            boolean valid = old != null && (!old.isLoaded(oldPos) || isCampfireLike(old.getBlockState(oldPos)));
+            if (valid) {
+                return; // l'equipe a deja un feu en place
+            }
+        }
+        set(team, level, pos); // message "registered" envoye a toute l'equipe ; le feu demarre eteint, a eux de l'allumer
+    }
+
+    public static void onCrafted(ServerPlayer player) {
+        if (config.enabled && config.autoRegister && TeamManager.teamIdOf(player.getUUID()) != null) {
+            ConseilMessages.send(config.message("crafted"), player, Map.of());
         }
     }
 
@@ -338,12 +509,14 @@ public final class CampfireManager {
         ServerBossEvent bar = bars.computeIfAbsent(team, k ->
                 new ServerBossEvent(Component.empty(), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS));
         int pct = percent(f);
-        bar.setName(Txt.of("&6&lFeu de camp &7- &f" + pct + "%"));
+        boolean dark = config.requireLit && unlit.contains(team) && f.fuel > 0.0;
+        bar.setName(Txt.of("&6&lFeu de camp &7- &f" + pct + "%" + (dark ? " &c(éteint, à rallumer)" : "")));
         bar.setProgress((float) Math.max(0.0, Math.min(1.0, f.fuel / Math.max(1.0, config.maxFuel))));
         bar.setColor(pct > 50 ? BossEvent.BossBarColor.GREEN
                 : pct > config.warnBelowPercent ? BossEvent.BossBarColor.YELLOW : BossEvent.BossBarColor.RED);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            if (team.equals(TeamManager.teamIdOf(p.getUUID()))) {
+            boolean staffInZone = KLPermissions.levelOf(p) >= KLPermissions.ORGANISATEUR && team.equals(zoneOf.get(p.getUUID()));
+            if (team.equals(TeamManager.teamIdOf(p.getUUID())) || staffInZone) {
                 bar.addPlayer(p);
             } else {
                 bar.removePlayer(p);
@@ -403,6 +576,7 @@ public final class CampfireManager {
                 value = Component.literal("aucun feu défini").withStyle(ChatFormatting.RED);
             } else {
                 String text = String.format("%.1f/%.0f (%d%%)  %d %d %d", f.fuel, config.maxFuel, percent(f), f.x, f.y, f.z)
+                        + (unlit.contains(e.getKey()) && f.fuel > 0.0 ? "  ÉTEINT (à rallumer)" : "")
                         + (isOut(e.getKey()) ? "  MALUS ACTIF" : "");
                 value = Component.literal(text).withStyle(isOut(e.getKey()) ? ChatFormatting.RED : ChatFormatting.GREEN);
             }

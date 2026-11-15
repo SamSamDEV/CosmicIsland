@@ -1,4 +1,8 @@
 {
   "block.cosmicisland.poteau": "Poteau",
-  "item.cosmicisland.collier": "Collier d'immunité"
+  "item.cosmicisland.collier": "Bracelet d'Exemption",
+  "item.cosmicisland.bandeau": "Bandeau",
+  "item.cosmicisland.brassard": "Brassard",
+  "block.cosmicisland.totem": "Globe d'immunité",
+  "itemGroup.cosmicisland": "Cosmic Island"
 }

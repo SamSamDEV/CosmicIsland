@@ -78,6 +78,10 @@ public class CosmicIsland {
                 InventoryStore.restore(player.getServer(), player);
             }
             RoleManager.onJoin(player);
+            Vocab.sendTo(player);
+            GameManager.onLogin(player);
+            fr.cosmicisland.conseil.ConseilManager.onLogin(player);
+            fr.cosmicisland.conseil.TotemManager.onLogin(player);
         }
     }
 }

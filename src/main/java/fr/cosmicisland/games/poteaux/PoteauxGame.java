@@ -7,7 +7,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import fr.cosmicisland.KLPermissions;
 import fr.cosmicisland.TeamManager;
-import fr.cosmicisland.camp.CampfireManager;
 import fr.cosmicisland.Txt;
 import fr.cosmicisland.game.GameConfig;
 import fr.cosmicisland.game.GameContext;
@@ -52,13 +51,13 @@ public class PoteauxGame implements KLGame {
     private static class Contestant {
         final UUID id;
         final String name;
-        final String group; // equipe (mode equipes) ou identifiant du joueur (mode solo)
+        String group; // equipe (mode equipes) ou identifiant du joueur (mode solo)
         int errors = 0;
         boolean alive = true;
         boolean answered = false;
         boolean falling = false;
         int fallTicks = 0;
-        int deadline = 0; // dernier tick ou la reponse est acceptee pour la fleche en cours
+        int offlineTicks = 0; // temps passe deconnecte (elimine au-dela de reconnectGraceSeconds)
 
         Contestant(UUID id, String name, String group) {
             this.id = id;
@@ -118,8 +117,6 @@ public class PoteauxGame implements KLGame {
         s.addProperty("firstDelayMs", 1500);  // delai avant la premiere fleche
         s.addProperty("pushStrength", 0.3);   // poussee vers l'avant (distance en blocs ~ 7 x valeur)
         s.addProperty("pushUp", 0.3);         // petit saut vers le haut pendant la poussee
-        s.addProperty("campfireWindowMultiplier", 0.75); // feu de camp eteint : temps pour appuyer x 0.75
-        s.addProperty("campfireErrorWeight", 2);         // feu de camp eteint : chaque erreur compte double
         s.addProperty("fallTimeoutTicks", 80); // elimination de secours si le joueur ne touche pas l'eau
         c.messages.put("fall", new GameConfig.Msg("&c&lTu perds l'équilibre !", "actionbar"));
         GameConfig.Msg eliminated = new GameConfig.Msg("&c&lÉLIMINÉ", "title");
@@ -182,6 +179,16 @@ public class PoteauxGame implements KLGame {
             groups.add(group);
             sendState(p, true, 0, 0);
         }
+        // Tout le monde dans la meme equipe (ex. equipe Blanche apres fusion, ou un seul camp present) :
+        // chaque joueur devient son propre groupe, sinon la partie ne pourrait jamais se terminer.
+        if (teamMode && groups.size() <= 1 && contestants.size() > 1) {
+            teamMode = false;
+            groups.clear();
+            for (Contestant c : contestants.values()) {
+                c.group = c.id.toString();
+                groups.add(c.group);
+            }
+        }
         initialGroups = groups.size();
     }
 
@@ -197,8 +204,15 @@ public class PoteauxGame implements KLGame {
             }
             ServerPlayer p = ctx.server().getPlayerList().getPlayer(c.id);
             if (p == null) {
+                // Deconnecte : sa place est gardee pendant reconnectGraceSeconds, puis il est elimine
+                c.offlineTicks++;
+                if (c.offlineTicks > Math.max(0, num(cfg, "reconnectGraceSeconds", 90)) * 20) {
+                    c.alive = false;
+                    eliminations.add(new Elimination(c.id, c.name, tickCounter / 20.0, "déconnecté", c.errors));
+                }
                 continue;
             }
+            c.offlineTicks = 0;
             if (p.isInWater() && (zone == null || inZone(p, zone))) {
                 eliminate(c, p, c.falling ? "perte d'équilibre" : "tombé à l'eau");
                 continue;
@@ -321,22 +335,18 @@ public class PoteauxGame implements KLGame {
         arrowsShown++;
         arrowActive = true;
         int grace = Math.max(0, (int) Math.ceil(num(cfg, "graceMs", 150) / 50.0));
-        int maxDeadline = tickCounter + ticks(windowMs) + grace;
+        arrowResolveTick = tickCounter + ticks(windowMs) + grace;
         for (Contestant c : contestants.values()) {
             if (!c.alive || c.falling) {
                 continue;
             }
             c.answered = false;
-            int win = windowFor(cfg, c);
-            c.deadline = tickCounter + ticks(win) + grace;
-            maxDeadline = Math.max(maxDeadline, c.deadline);
             ServerPlayer p = online(c);
             if (p != null) {
                 GameMessages.clearTitle(p); // evite que le GO ou un titre cache la fleche
-                PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(arrowDir, win));
+                PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(arrowDir, windowMs));
             }
         }
-        arrowResolveTick = maxDeadline;
     }
 
     private void resolveArrow(GameConfig cfg) {
@@ -346,9 +356,10 @@ public class PoteauxGame implements KLGame {
                 continue;
             }
             ServerPlayer p = online(c);
-            if (p != null) {
-                PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(-1, 0));
+            if (p == null) {
+                continue; // deconnecte : pas d'erreur comptee, sa place est gardee
             }
+            PoteauxNetwork.toPlayer(p, new PoteauxNetwork.ArrowPacket(-1, 0));
             if (!c.answered) {
                 fail(cfg, c, p);
             }
@@ -357,6 +368,16 @@ public class PoteauxGame implements KLGame {
         windowMs = Math.max(num(cfg, "windowMinMs", 500), windowMs - num(cfg, "windowStepMs", 75));
         gapMs = Math.max(num(cfg, "gapMinMs", 400), gapMs - num(cfg, "gapStepMs", 40));
         nextArrowTick = tickCounter + ticks(gapMs);
+    }
+
+    /** Reconnexion en cours d'epreuve : le joueur retrouve sa jauge d'erreurs. */
+    @Override
+    public void onRejoin(GameContext ctx, ServerPlayer player) {
+        Contestant c = contestants.get(player.getUUID());
+        if (c != null && c.alive) {
+            c.offlineTicks = 0;
+            sendState(player, true, c.errors, 0);
+        }
     }
 
     public static void handleKey(ServerPlayer player, int direction) {
@@ -373,7 +394,7 @@ public class PoteauxGame implements KLGame {
             return;
         }
         c.answered = true;
-        if (dir == arrowDir && tickCounter <= c.deadline) {
+        if (dir == arrowDir && tickCounter <= arrowResolveTick) {
             GameMessages.playSound(player, "minecraft:block.note_block.pling", 1.6f);
             sendState(player, true, c.errors, 1);
         } else {
@@ -382,7 +403,7 @@ public class PoteauxGame implements KLGame {
     }
 
     private void fail(GameConfig cfg, Contestant c, ServerPlayer p) {
-        c.errors += errorWeight(cfg, c);
+        c.errors++;
         if (p == null) {
             c.alive = false; // joueur deconnecte
             eliminations.add(new Elimination(c.id, c.name, tickCounter / 20.0, "déconnecté", c.errors));
@@ -470,24 +491,6 @@ public class PoteauxGame implements KLGame {
     }
 
     // ------------------------------------------------------------ utilitaires
-
-    /** Feu de camp eteint : le malus de difficulte s'applique-t-il a ce joueur ? */
-    private static boolean fireOut(GameConfig cfg, Contestant c) {
-        return cfg.campfireDebuff && CampfireManager.isOut(TeamManager.teamIdOf(c.id));
-    }
-
-    /** Temps (ms) pour repondre : reduit si le feu de camp de l'equipe est eteint. */
-    private int windowFor(GameConfig cfg, Contestant c) {
-        if (!fireOut(cfg, c)) {
-            return windowMs;
-        }
-        return Math.max(150, (int) Math.round(windowMs * dbl(cfg, "campfireWindowMultiplier", 0.75)));
-    }
-
-    /** Poids d'une erreur : plus lourd si le feu de camp de l'equipe est eteint. */
-    private static int errorWeight(GameConfig cfg, Contestant c) {
-        return fireOut(cfg, c) ? Math.max(1, num(cfg, "campfireErrorWeight", 2)) : 1;
-    }
 
     private static ServerPlayer online(Contestant c) {
         if (GameManager.server() == null) {

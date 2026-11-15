@@ -39,6 +39,9 @@ public interface KLGame {
         return null;
     }
 
+    /** Un participant s'est reconnecte pendant l'epreuve en cours : le jeu peut lui renvoyer son interface. */
+    default void onRejoin(GameContext ctx, net.minecraft.server.level.ServerPlayer player) {}
+
     /**
      * Appele par le moteur a la fin d'une epreuve qui a demarre (avant onStop). Le jeu retourne son resultat
      * (vainqueurs, classement, details) pour enregistrer victoires et logs. null = aucun resultat.

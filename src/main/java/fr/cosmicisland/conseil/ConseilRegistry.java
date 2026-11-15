@@ -22,6 +22,11 @@ public final class ConseilRegistry {
                 public boolean isFoil(ItemStack stack) {
                     return true;
                 }
+
+                @Override
+                public net.minecraft.network.chat.Component getName(ItemStack stack) {
+                    return net.minecraft.network.chat.Component.literal(fr.cosmicisland.Vocab.nom("collier"));
+                }
             });
 
     private ConseilRegistry() {}
@@ -29,13 +34,7 @@ public final class ConseilRegistry {
     /** A appeler depuis le constructeur du mod avec le bus d'evenements du mod. */
     public static void init(IEventBus modBus) {
         ITEMS.register(modBus);
-        modBus.addListener(ConseilRegistry::onCreativeTab);
         modBus.addListener(ConseilNetwork::onSetup);
     }
 
-    private static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(COLLIER);
-        }
-    }
 }

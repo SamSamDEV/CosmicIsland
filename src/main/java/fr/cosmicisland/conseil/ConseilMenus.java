@@ -26,12 +26,12 @@ public final class ConseilMenus {
         }
         UUID me = player.getUUID();
         if (!ConseilManager.isCandidate(me)) {
-            return "Tu ne participes pas à ce conseil.";
+            return "Tu ne participes pas à {v_au_conseil}.";
         }
         boolean self = ConseilManager.config().allowSelfVote;
         List<Map.Entry<UUID, String>> list = new ArrayList<>();
         for (Map.Entry<UUID, String> e : ConseilManager.candidates().entrySet()) {
-            if (self || !e.getKey().equals(me)) {
+            if ((self || !e.getKey().equals(me)) && !ConseilManager.isTotemProtected(e.getKey())) {
                 list.add(e);
             }
         }
@@ -65,7 +65,7 @@ public final class ConseilMenus {
         container.setItem(rows * 9 - 5, MenuItems.named(Items.PAPER, "&6&lTon choix",
                 List.of(recap, "", "&8Tu peux changer ton vote jusqu'à la clôture.")));
 
-        KLMenu.open(player, Txt.of("&6&lConseil &8- &7Vote"), rows, container, "conseil-vote", (p, slot) -> {
+        KLMenu.open(player, Txt.of("&6&l{v_conseil} &8- &7Vote"), rows, container, "conseil-vote", (p, slot) -> {
             UUID target = slots.get(slot);
             if (target != null) {
                 openConfirm(p, target);

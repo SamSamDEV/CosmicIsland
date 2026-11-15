@@ -1,0 +1,20 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "cosmicisland:block/totem",
+   "y": 0
+  },
+  "facing=east": {
+   "model": "cosmicisland:block/totem",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "cosmicisland:block/totem",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "cosmicisland:block/totem",
+   "y": 270
+  }
+ }
+}

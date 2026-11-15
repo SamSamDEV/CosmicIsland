@@ -37,13 +37,7 @@ public final class PoteauxRegistry {
     public static void init(IEventBus modBus) {
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
-        modBus.addListener(PoteauxRegistry::onCreativeTab);
         modBus.addListener(PoteauxNetwork::onSetup);
     }
 
-    private static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
-            event.accept(POTEAU_ITEM);
-        }
-    }
 }

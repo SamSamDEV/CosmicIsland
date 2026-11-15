@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 /**
  * Placeholders utilisables dans les messages de tous les jeux :
  * {joueur} {equipe} {victoires} {victoires_<jeu>}
+ * {equipe_<id>} (nom actuel de l'equipe rouge/jaune/blanche...)  {tag_<id>} (son tag)
  * {classement_N_nom} {classement_N_victoires}            (classement general, N = 1, 2, 3...)
  * {classement_<jeu>_N_nom} {classement_<jeu>_N_victoires} (classement d'un jeu)
  */
@@ -18,13 +19,22 @@ public final class Placeholders {
     private static final Pattern RANK =
             Pattern.compile("\\{classement_(?:([a-zA-Z0-9-]+)_)?(\\d{1,3})_(nom|victoires)\\}");
 
+    private static final Pattern TEAM_NAME = Pattern.compile("\\{(equipe|tag)_([a-zA-Z0-9-]+)\\}");
+
     private Placeholders() {}
 
     public static String apply(String text, ServerPlayer player) {
         if (text == null || text.indexOf('{') < 0) {
             return text;
         }
-        String result = text;
+        text = fr.cosmicisland.Vocab.apply(text);
+        String result = TEAM_NAME.matcher(text).replaceAll(m -> {
+            TeamManager.KLTeam t = TeamManager.get(m.group(2));
+            if (t == null) {
+                return Matcher.quoteReplacement(m.group(0));
+            }
+            return Matcher.quoteReplacement(m.group(1).equals("equipe") ? t.name : t.tag);
+        });
 
         if (player != null) {
             String teamId = TeamManager.teamIdOf(player.getUUID());

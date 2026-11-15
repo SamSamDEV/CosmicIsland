@@ -129,17 +129,17 @@ public final class AdminMenus {
         c.setItem(10, MenuItems.named(Items.COMPASS, "&6&lÉpreuves", List.of(
                 "&7Démarrer, lancer, geler, arrêter,", "&7activer et désactiver les jeux")));
         c.setItem(11, MenuItems.named(Items.WHITE_BANNER, "&6&lÉquipes", List.of(
-                "&7Couleur, gras du tag, fusion")));
+                "&7Couleur, gras du tag, {v_reunification}")));
         c.setItem(12, MenuItems.named(Items.PLAYER_HEAD, "&6&lJoueurs et rôles", List.of(
                 "&7Rôle et équipe des joueurs connectés")));
         c.setItem(13, MenuItems.named(Items.CAMPFIRE, "&6&lFeux de camp", List.of(
                 "&7Jauge de chaque équipe, ajout et retrait")));
-        c.setItem(14, MenuItems.named(Items.LECTERN, "&6&lConseil", List.of(
-                "&7Lancer ou piloter le conseil")));
+        c.setItem(14, MenuItems.named(Items.LECTERN, "&6&l{v_conseil}", List.of(
+                "&7Lancer ou piloter {v_le_conseil}")));
         c.setItem(15, MenuItems.named(Items.GOLD_INGOT, "&6&lClassement", List.of(
                 "&7Top 10 et remises à zéro")));
         c.setItem(16, MenuItems.named(Items.ENDER_PEARL, "&6&lSpawns", List.of(
-                "&7Zones de jeu, bases, respawn,", "&7conseil et élimination")));
+                "&7Zones de jeu, bases, respawn,", "&7{v_le_conseil} et {v_elimination}")));
         c.setItem(22, MenuItems.named(Items.REDSTONE, "&c&lRecharger les configs", List.of(
                 "&7Relit tous les fichiers de config.", "&8Admin uniquement")));
         c.setItem(26, MenuItems.named(Items.BARRIER, "&c&lFermer", List.of("&7Ferme le menu")));
@@ -272,11 +272,11 @@ public final class AdminMenus {
                 openTeamDetail(p, ids.get(slot));
             } else if (slot == 22) {
                 if (needAdmin(p)) {
-                    confirm(p, "Fusion des équipes",
-                            "Tous les joueurs passent dans l'équipe " + TeamManager.MERGED_ID + ".",
+                    confirm(p, "{v_reunification} des équipes",
+                            "Annonce à tous, puis tout le monde passe dans l'équipe " + TeamManager.MERGED_ID + ".",
                             () -> {
                                 if (TeamManager.merge()) {
-                                    msg(p, "&aFusion effectuée.");
+                                    msg(p, "&a{v_reunification} effectuée.");
                                 } else {
                                     msg(p, "&cL'équipe " + TeamManager.MERGED_ID + " n'existe pas.");
                                 }
@@ -314,7 +314,7 @@ public final class AdminMenus {
             lore.add("&8Nom et tag : /ccis team name|tag");
             c.setItem(i, MenuItems.named(bannerFor(t.format()), colorCode(t) + "&l" + t.name, lore));
         }
-        c.setItem(22, MenuItems.named(Items.NETHER_STAR, "&d&lFusion des équipes", List.of(
+        c.setItem(22, MenuItems.named(Items.NETHER_STAR, "&d&l{v_reunification} des équipes", List.of(
                 "&7État : " + (TeamManager.isMerged() ? "&afusionnées" : "&7séparées"),
                 "&7Tous les joueurs passent dans l'équipe " + TeamManager.MERGED_ID + ".",
                 "&8Admin uniquement")));
@@ -490,12 +490,12 @@ public final class AdminMenus {
         List<String> ids = teamIds();
         SimpleContainer c = new SimpleContainer(27);
         boolean spawns = SpawnManager.get("conseil") != null && SpawnManager.get("elimination") != null;
-        c.setItem(4, MenuItems.named(Items.PAPER, "&6&lLancer un conseil", List.of(
-                "&7Choisis l'équipe qui va au conseil.",
-                "&7Spawns conseil et élimination : " + (spawns ? "&adéfinis" : "&cmanquants (menu Spawns)"),
+        c.setItem(4, MenuItems.named(Items.PAPER, "&6&lLancer {v_un_conseil}", List.of(
+                "&7Choisis l'équipe qui va {v_au_conseil}.",
+                "&7Spawns {v_du_conseil} et {v_du_elimination} : " + (spawns ? "&adéfinis" : "&cmanquants (menu Spawns)"),
                 "",
-                "&8Clic gauche : conseil réel",
-                "&8Clic droit : conseil TEST (3 joueurs fictifs)")));
+                "&8Clic gauche : {v_le_conseil} réel",
+                "&8Clic droit : {v_le_conseil} TEST (3 joueurs fictifs)")));
         for (int i = 0; i < ids.size() && i < 9; i++) {
             TeamManager.KLTeam t = TeamManager.get(ids.get(i));
             if (t == null) {
@@ -503,10 +503,10 @@ public final class AdminMenus {
             }
             c.setItem(9 + i, MenuItems.named(bannerFor(t.format()), colorCode(t) + "&l" + t.name, List.of(
                     "&7Membres : &f" + t.members.size(),
-                    "&8Lancer le conseil pour cette équipe")));
+                    "&8Lancer {v_le_conseil} pour cette équipe")));
         }
         c.setItem(26, backItem("Menu principal"));
-        KLMenu.openWith(player, Txt.of("&6&lConseil"), 3, c, "admin-conseil", (p, slot, button) -> {
+        KLMenu.openWith(player, Txt.of("&6&l{v_conseil}"), 3, c, "admin-conseil", (p, slot, button) -> {
             int i = slot - 9;
             if (slot >= 9 && slot < 18 && i < ids.size()) {
                 String err = button == 1 ? ConseilManager.start(ids.get(i), 3) : ConseilManager.start(ids.get(i));
@@ -647,8 +647,8 @@ public final class AdminMenus {
             list.add(new SpawnEntry("base:" + teams.get(i), name + " &7(base)", 18 + i));
             list.add(new SpawnEntry("respawn:" + teams.get(i), name + " &7(respawn mort)", 27 + i));
         }
-        list.add(new SpawnEntry("conseil", "&6&lConseil", 36));
-        list.add(new SpawnEntry("elimination", "&c&lÉlimination", 37));
+        list.add(new SpawnEntry("conseil", "&6&l{v_conseil}", 36));
+        list.add(new SpawnEntry("elimination", "&c&l{v_elimination}", 37));
         return list;
     }
 

@@ -1,0 +1,5 @@
+Ne retouche QUE les zones colorees du GABARIT (dessus/dessous/gauche/face/droite/dos), en blanc/gris.
+Le reste du fichier doit rester VIDE (transparent).
+Bandeau : les 3 lignes de flanc (y 8 a 10) sont la bande visible. DESSUS et DESSOUS sont les tranches fines
+visibles au bord haut et bas : mets-y une couleur proche de la bande (pas de noir), sinon on voit un 'trait'.
+Pas de demi-transparence : un pixel est soit plein, soit vide.

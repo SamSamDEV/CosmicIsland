@@ -33,10 +33,33 @@ public final class ConseilNetwork {
 
     private static void register() {
         CHANNEL.registerMessage(0, TallyPacket.class, TallyPacket::encode, TallyPacket::decode, TallyPacket::handle);
+        CHANNEL.registerMessage(1, VocabPacket.class, VocabPacket::encode, VocabPacket::decode, VocabPacket::handle);
     }
 
     public static void toPlayer(ServerPlayer player, Object packet) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+    }
+
+    /** Vocabulaire de la saison (vocabulary.json) envoye au client pour les noms d'objets. */
+    public static class VocabPacket {
+        final String json;
+
+        public VocabPacket(String json) {
+            this.json = json;
+        }
+
+        static void encode(VocabPacket p, FriendlyByteBuf buf) {
+            buf.writeUtf(p.json, 32767);
+        }
+
+        static VocabPacket decode(FriendlyByteBuf buf) {
+            return new VocabPacket(buf.readUtf(32767));
+        }
+
+        static void handle(VocabPacket p, Supplier<NetworkEvent.Context> ctx) {
+            ctx.get().enqueueWork(() -> fr.cosmicisland.Vocab.setFromJson(p.json));
+            ctx.get().setPacketHandled(true);
+        }
     }
 
     /** Decompte des votes : active ou non, noms des joueurs et nombre de votes reveles pour chacun. */
