@@ -8,12 +8,12 @@ public final class Txt {
 
     /** Texte brut avec les termes du vocabulaire de la saison. */
     public static MutableComponent lit(String text) {
-        return Component.literal(Vocab.apply(text));
+        return Component.literal(Vocab.apply(Lang.tr(text)));
     }
 
     /** Convertit les codes &c, &l, etc. en codes Minecraft. */
     public static MutableComponent of(String text) {
-        return Component.literal(Vocab.apply(text).replace('&', '\u00a7'));
+        return Component.literal(Vocab.apply(Lang.tr(text)).replace('&', '\u00a7'));
     }
 
     /** Reponse de commande reussie : coche verte. */

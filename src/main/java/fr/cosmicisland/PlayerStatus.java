@@ -25,7 +25,7 @@ public final class PlayerStatus {
                 .append(Txt.of("&6[Aventure] &7Veux-tu vraiment &cabandonner&7 ? Tu seras spectateur. "))
                 .append(Txt.lit("[OUI, J'ABANDONNE]").withStyle(Style.EMPTY
                         .withColor(ChatFormatting.RED).withBold(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ccis abandon confirm"))
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, CommandAliases.cmd("/ccis giveup confirm")))
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Txt.of("&7Quitter définitivement l'aventure"))))));
         return null;
     }
@@ -47,6 +47,7 @@ public final class PlayerStatus {
             return error;
         }
         GameProfile profile = player.getGameProfile();
+        SeasonHistory.log("abandon", profile.getName() + " abandonne l'aventure.");
         RoleManager.set(profile, KLRole.SPECTATEUR);
         RoleManager.apply(player, KLRole.SPECTATEUR);
         SpawnManager.Spawn out = SpawnManager.get("elimination");
@@ -94,6 +95,7 @@ public final class PlayerStatus {
         RoleManager.set(profile, KLRole.PARTICIPANT);
         ServerPlayer online = server.getPlayerList().getPlayer(profile.getId());
         TeamManager.KLTeam team = TeamManager.get(teamId);
+        SeasonHistory.log("retour", profile.getName() + " revient dans l'aventure (équipe " + team.name + ").");
         if (online == null) {
             return null; // il sera remis en jeu a sa connexion (role participant + equipe)
         }

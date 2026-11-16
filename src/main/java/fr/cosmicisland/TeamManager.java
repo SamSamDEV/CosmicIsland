@@ -261,12 +261,16 @@ public final class TeamManager {
         }
         store.merged = true;
         changed();
+        SeasonHistory.log("fusion", "{V_le_reunification} : toutes les équipes sont réunies dans « " + target.name + " ».");
         announceFusion();
         return true;
     }
 
     /** Retour aux equipes separees : l'equipe de fusion est supprimee (ses joueurs sont sans equipe, a reassigner). */
     public static void unmerge() {
+        if (store.merged) {
+            SeasonHistory.log("defusion", "Retour aux équipes séparées.");
+        }
         store.merged = false;
         if (store.teams.remove(MERGED_ID) != null) {
             fr.cosmicisland.camp.CampfireManager.remove(MERGED_ID);

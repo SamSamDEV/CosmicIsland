@@ -268,7 +268,7 @@ public final class ConseilManager {
             return "Le serveur n'est pas prêt.";
         }
         if (phase != Phase.IDLE) {
-            return "Il y a déjà {v_un_conseil} en cours (équipe " + teamName() + "). Utilise /ccis conseil cancel pour l'annuler.";
+            return "Il y a déjà {v_un_conseil} en cours (équipe " + teamName() + "). Utilise /ccis council cancel pour l'annuler.";
         }
         TeamManager.KLTeam t = TeamManager.get(team);
         if (t == null) {
@@ -334,7 +334,7 @@ public final class ConseilManager {
             }
         }
         notifyStaff("{v_conseil} lancé pour l'équipe &f" + t.name + "&7 (&f" + candidates.size()
-                + "&7 participants). Suis le déroulé avec &f/ccis conseil menu&7.");
+                + "&7 participants). Suis le déroulé avec &f/ccis council menu&7.");
         return null;
     }
 
@@ -423,7 +423,7 @@ public final class ConseilManager {
         notifyStaff("&f" + voter.getGameProfile().getName() + "&7 a voté (&f" + votes.size() + "&7/&f"
                 + expectedVoters() + "&7)" + (first ? "" : " &8(vote modifié)"));
         if (votes.size() >= expectedVoters()) {
-            notifyStaff("Tout le monde a voté : clos le vote avec &f/ccis conseil vote close&7 ou le menu.");
+            notifyStaff("Tout le monde a voté : clos le vote avec &f/ccis council vote close&7 ou le menu.");
         }
         saveState();
         refreshAdminMenus();
@@ -445,7 +445,7 @@ public final class ConseilManager {
             }
         }
         notifyStaff("Vote clos : &f" + votes.size() + "&7/&f" + candidates.size()
-                + "&7 votes reçus. Lance &f/ccis conseil reveal&7 : les porteurs {v_du_collier} seront interrogés avant le dépouillement.");
+                + "&7 votes reçus. Lance &f/ccis council reveal&7 : les porteurs {v_du_collier} seront interrogés avant le dépouillement.");
         saveState();
         refreshAdminMenus();
         return null;
@@ -488,7 +488,7 @@ public final class ConseilManager {
             return "{v_conseil} : rien en cours.";
         }
         if (phase == Phase.VOTING) {
-            return "Clos d'abord le vote (/ccis conseil vote close).";
+            return "Clos d'abord le vote (/ccis council vote close).";
         }
         if (phase == Phase.COLLIER) {
             collierPending.clear(); // l'organisateur passe l'etape du collier
@@ -496,7 +496,7 @@ public final class ConseilManager {
             return null;
         }
         if (phase != Phase.CLOSED) {
-            return "Le dépouillement a déjà eu lieu (utilise /ccis conseil revote ou /ccis conseil close).";
+            return "Le dépouillement a déjà eu lieu (utilise /ccis council revote ou /ccis council close).";
         }
         if (config.collierPromptSeconds > 0 && startCollierPhase()) {
             return null;
@@ -552,17 +552,17 @@ public final class ConseilManager {
                 continue;
             }
             Component yes = Txt.of("&a&l" + config.buttonCollierYes).withStyle(style -> style
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ccis collier oui"))
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, fr.cosmicisland.CommandAliases.cmd("/ccis bracelet yes")))
                     .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                             Txt.of("&7Tu révèles ton immunité : les votes contre toi ne pourront pas t'éliminer."))));
             Component no = Txt.of("&c&l" + config.buttonCollierNo).withStyle(style -> style
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ccis collier non"))
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, fr.cosmicisland.CommandAliases.cmd("/ccis bracelet no")))
                     .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Txt.of("&7Tu gardes {v_le_collier}."))));
             ConseilMessages.send(config.message("collierPrompt"), p, Map.of());
             p.sendSystemMessage(Component.empty().append(yes).append(Txt.lit("   ")).append(no));
         }
         notifyStaff("Porteurs de collier interrogés (&f" + collierPending.size() + "&7) : le dépouillement commence "
-                + "après leur réponse (max &f" + config.collierPromptSeconds + "s&7). Relance &f/ccis conseil reveal&7 pour passer.");
+                + "après leur réponse (max &f" + config.collierPromptSeconds + "s&7). Relance &f/ccis council reveal&7 pour passer.");
         saveState();
         refreshAdminMenus();
         return true;
@@ -586,6 +586,9 @@ public final class ConseilManager {
                 ConseilMessages.send(config.message("collierRevealed"), p, Map.of("nom", name));
             }
             notifyStaff("&f" + name + "&7 utilise {v_le_collier} : &eimmunisé&7.");
+            if (fakes.isEmpty()) {
+                fr.cosmicisland.SeasonHistory.log("collier", name + " utilise {v_le_collier} et devient immunisé.");
+            }
         } else {
             ConseilMessages.send(config.message("collierKept"), player, Map.of());
             notifyStaff("&f" + name + "&7 garde {v_le_collier}.");
@@ -676,6 +679,13 @@ public final class ConseilManager {
         }
         phase = Phase.REVEALED;
         recordRound(false);
+        if (lastResult.equals("tie") && fakes.isEmpty()) {
+            List<String> names = new ArrayList<>();
+            for (UUID l : leaders) {
+                names.add(candidates.getOrDefault(l, "?"));
+            }
+            fr.cosmicisland.SeasonHistory.log("egalite", "Égalité au conseil de l'équipe " + teamName() + " : " + String.join(", ", names) + ".");
+        }
         if (overallLeader != null && immune.contains(overallLeader) && eliminated != null) {
             notifyStaff("&f" + candidates.getOrDefault(overallLeader, "?") + "&7 avait le plus de votes (" + overall
                     + ") mais est immunisé : le suivant est éliminé.");
@@ -690,10 +700,10 @@ public final class ConseilManager {
         }
         if (eliminated != null) {
             notifyStaff("Résultat : &c" + name + "&7 est éliminé. Laisse-lui le temps de son discours, puis "
-                    + "valide avec &f/ccis conseil close&7 (ou le menu).");
+                    + "valide avec &f/ccis council close&7 (ou le menu).");
         } else {
             notifyStaff("Résultat : " + (lastResult.equals("tie") ? "&eégalité" : "&eaucun vote valide")
-                    + "&7. Lance un nouveau vote avec &f/ccis conseil revote&7 (ou le menu).");
+                    + "&7. Lance un nouveau vote avec &f/ccis council revote&7 (ou le menu).");
         }
         refreshAdminMenus();
     }
@@ -747,7 +757,7 @@ public final class ConseilManager {
             return "Le dépouillement n'est pas terminé (étapes : vote close, reveal, puis close).";
         }
         if (eliminated == null) {
-            return "Pas d'éliminé (égalité ou aucun vote valide) : lance un nouveau vote avec /ccis conseil revote.";
+            return "Pas d'éliminé (égalité ou aucun vote valide) : lance un nouveau vote avec /ccis council revote.";
         }
         UUID out = eliminated;
         String outName = candidates.getOrDefault(out, "?");
@@ -788,6 +798,11 @@ public final class ConseilManager {
                     TotemManager.consume(holder);
                 }
             }
+        }
+        if (!test) {
+            int got = tally.getOrDefault(out, 0);
+            fr.cosmicisland.SeasonHistory.log("elimination", plainName(outName) + " est éliminé (" + got + " vote" + (got > 1 ? "s" : "")
+                    + ") au conseil de l'équipe " + teamName() + ".");
         }
         writeLog("closed", outName);
         notifyStaff("{v_conseil} clos : &f" + outName + (test
@@ -1202,7 +1217,7 @@ public final class ConseilManager {
             player.sendSystemMessage(Component.empty()
                     .append(Txt.lit("[{v_conseil}] ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
                     .append(Txt.of("&7{v_conseil} en cours (équipe &f" + teamName() + "&7, " + phaseLabel()
-                            + "). Suis-le avec &f/ccis conseil menu&7.")));
+                            + "). Suis-le avec &f/ccis council menu&7.")));
         }
         if (candidates.containsKey(player.getUUID())) {
             if (phase == Phase.VOTING) {
@@ -1218,6 +1233,10 @@ public final class ConseilManager {
 
     private static ServerPlayer online(UUID id) {
         return server == null ? null : server.getPlayerList().getPlayer(id);
+    }
+
+    private static String plainName(String s) {
+        return s == null ? "?" : s;
     }
 
     private static String teamName() {

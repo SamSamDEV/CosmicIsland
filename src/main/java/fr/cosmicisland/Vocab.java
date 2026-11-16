@@ -30,6 +30,8 @@ public final class Vocab {
                 + "Usage dans les textes : {v_conseil} {v_le_conseil} {v_du_conseil} {v_au_conseil} {v_un_conseil} ({V_...} = majuscules). "
                 + "Les noms des objets (Bracelet d'Exemption, Globe d'immunité) sont dans assets/cosmicisland/lang/*.json.";
         public Map<String, Term> termes = defaults();
+        /** Termes utilises quand la langue des messages est l'anglais (settings.json). */
+        public Map<String, Term> termesEn = defaultsEn();
     }
 
     private static final Pattern TOKEN = Pattern.compile("\\{([vV])_(?:(le|du|au|un)_)?([a-z]+)\\}");
@@ -48,6 +50,21 @@ public final class Vocab {
         return m;
     }
 
+    public static Map<String, Term> defaultsEn() {
+        Map<String, Term> m = new LinkedHashMap<>();
+        m.put("totem", new Term("Immunity Globe", "the Immunity Globe", "of the Immunity Globe", "to the Immunity Globe", "an Immunity Globe"));
+        m.put("collier", new Term("Exemption Bracelet", "the Exemption Bracelet", "of the Exemption Bracelet", "to the Exemption Bracelet", "an Exemption Bracelet"));
+        m.put("conseil", new Term("Eclipse", "the Eclipse", "of the Eclipse", "to the Eclipse", "an Eclipse"));
+        m.put("confort", new Term("Stellar Harvest", "the Stellar Harvest", "of the Stellar Harvest", "to the Stellar Harvest", "a Stellar Harvest"));
+        m.put("reunification", new Term("Merge", "the Merge", "of the Merge", "to the Merge", "a Merge"));
+        m.put("elimination", new Term("Elimination", "the Elimination", "of the Elimination", "to the Elimination", "an Elimination"));
+        return m;
+    }
+
+    private static Map<String, Term> terms() {
+        return "en".equals(Lang.language()) && data.termesEn != null ? data.termesEn : data.termes;
+    }
+
     public static void load() {
         Data d = KLFiles.load("vocabulary.json", Data.class, Data::new);
         if (d.termes == null) {
@@ -55,6 +72,11 @@ public final class Vocab {
         }
         // termes manquants (ajoutes dans une mise a jour) : valeurs par defaut
         defaults().forEach(d.termes::putIfAbsent);
+        if (d.termesEn == null) {
+            d.termesEn = new LinkedHashMap<>();
+        }
+        defaultsEn().forEach(d.termesEn::putIfAbsent);
+        KLFiles.save("vocabulary.json", d);
         // ancien nom par defaut (avant le Bracelet) : mise a jour automatique
         Term old = d.termes.get("collier");
         if (old != null && "Anneau d'Exemption".equals(old.nom)) {
@@ -66,12 +88,12 @@ public final class Vocab {
 
     /** Nom d'un terme pour les noms d'objets (cote client : valeurs recues du serveur). */
     public static String nom(String key) {
-        Term t = data.termes.get(key);
+        Term t = terms().get(key);
         return t == null ? key : t.nom;
     }
 
     public static String toJson() {
-        return new com.google.gson.Gson().toJson(data.termes);
+        return new com.google.gson.Gson().toJson(terms());
     }
 
     /** Termes recus du serveur (le client n'a pas forcement le fichier de config). */
@@ -94,7 +116,7 @@ public final class Vocab {
         fr.cosmicisland.conseil.ConseilNetwork.toPlayer(player, new fr.cosmicisland.conseil.ConseilNetwork.VocabPacket(toJson()));
     }
 
-    private static void broadcast() {
+    public static void broadcast() {
         net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
         if (server != null) {
             server.execute(() -> server.getPlayerList().getPlayers().forEach(Vocab::sendTo));
@@ -107,7 +129,7 @@ public final class Vocab {
             return text;
         }
         return TOKEN.matcher(text).replaceAll(m -> {
-            Term t = data.termes.get(m.group(3));
+            Term t = terms().get(m.group(3));
             if (t == null) {
                 return Matcher.quoteReplacement(m.group(0));
             }

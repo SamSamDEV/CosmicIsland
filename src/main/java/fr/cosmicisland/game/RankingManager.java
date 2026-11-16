@@ -128,6 +128,14 @@ public final class RankingManager {
                 stats(e.getKey(), e.getValue()).played++;
             }
             if (result != null) {
+                java.util.List<String> names = new java.util.ArrayList<>();
+                for (UUID id : result.winners) {
+                    names.add(participants.getOrDefault(id, "?"));
+                }
+                if (!names.isEmpty()) {
+                    String who = result.teamMode && result.winnerTeam != null ? "l'équipe " + result.winnerTeam : String.join(", ", names);
+                    fr.cosmicisland.SeasonHistory.log("epreuve", cfg.displayName + " : victoire de " + who + ".");
+                }
                 for (UUID id : result.winners) {
                     PlayerStats s = stats(id, participants.get(id));
                     s.wins++;

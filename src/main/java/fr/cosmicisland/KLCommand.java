@@ -156,7 +156,7 @@ public final class KLCommand {
                                         .then(Commands.argument("equipe", StringArgumentType.word())
                                                 .suggests(TEAM_IDS)
                                                 .executes(c -> teamSpawnTp(c, "respawn:")))))
-                        .then(Commands.literal("jeu")
+                        .then(Commands.literal("game")
                                 .then(Commands.argument("jeu", StringArgumentType.word())
                                         .suggests(GAME_IDS)
                                         .then(Commands.argument("equipe", StringArgumentType.word())
@@ -166,11 +166,11 @@ public final class KLCommand {
                                 .executes(KLCommand::spawnList)))
                 .then(Commands.literal("ranking")
                         .executes(c -> rankingTop(c, null))
-                        .then(Commands.literal("jeu")
+                        .then(Commands.literal("game")
                                 .then(Commands.argument("jeu", StringArgumentType.word())
                                         .suggests(GAME_IDS)
                                         .executes(c -> rankingTop(c, StringArgumentType.getString(c, "jeu")))))
-                        .then(Commands.literal("joueur")
+                        .then(Commands.literal("player")
                                 .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
                                         .executes(KLCommand::rankingPlayer)))
                         .then(Commands.literal("reset")
@@ -193,10 +193,10 @@ public final class KLCommand {
                                 .executes(KLCommand::placeholderTest)))
                 .then(Commands.literal("vote")
                         .executes(KLCommand::conseilVote))
-                .then(Commands.literal("collier")
-                        .then(Commands.literal("oui").executes(c -> collierAnswer(c, true)))
-                        .then(Commands.literal("non").executes(c -> collierAnswer(c, false))))
-                .then(Commands.literal("conseil")
+                .then(Commands.literal("bracelet")
+                        .then(Commands.literal("yes").executes(c -> collierAnswer(c, true)))
+                        .then(Commands.literal("no").executes(c -> collierAnswer(c, false))))
+                .then(Commands.literal("council")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .then(Commands.literal("start")
                                 .then(Commands.argument("equipe", StringArgumentType.word())
@@ -223,7 +223,7 @@ public final class KLCommand {
                                 .executes(c -> conseilAction(c, "close")))
                         .then(Commands.literal("cancel")
                                 .executes(c -> conseilAction(c, "cancel")))
-                        .then(Commands.literal("immunite")
+                        .then(Commands.literal("immunity")
                                 .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
                                         .executes(KLCommand::conseilImmunity))))
                 .then(Commands.literal("role")
@@ -282,14 +282,14 @@ public final class KLCommand {
                                 .executes(KLCommand::teamUnmerge)));
 
         // {v_reunification} : lancee a la main par un admin ou un organisateur
-        root.then(Commands.literal("fusion")
+        root.then(Commands.literal("merge")
                 .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                 .executes(KLCommand::teamMerge)
                 .then(Commands.argument("nom", StringArgumentType.greedyString())
                         .executes(KLCommand::teamMerge)));
 
-        // Reponse du staff a un joueur : /ccis orga <joueur> <message> (les joueurs ecrivent avec /admin <message>)
-        root.then(Commands.literal("orga")
+        // Reponse du staff a un joueur : /ccis reply <joueur> <message> (les joueurs ecrivent avec /admin <message>)
+        root.then(Commands.literal("reply")
                 .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                 .then(Commands.argument("joueur", net.minecraft.commands.arguments.EntityArgument.player())
                         .then(Commands.argument("message", StringArgumentType.greedyString())
@@ -325,8 +325,58 @@ public final class KLCommand {
                             return 1;
                         }))));
 
+        // Langue des messages (fr / en)
+        root.then(Commands.literal("language")
+                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                .executes(c -> {
+                    c.getSource().sendSuccess(() -> Txt.info("Langue actuelle : " + Lang.language() + " (fr ou en)"), false);
+                    return 1;
+                })
+                .then(Commands.argument("lang", StringArgumentType.word())
+                        .suggests((c, b) -> SharedSuggestionProvider.suggest(List.of("fr", "en"), b))
+                        .executes(c -> {
+                            String l = StringArgumentType.getString(c, "lang").toLowerCase();
+                            if (!Lang.setLanguage(l)) {
+                                c.getSource().sendFailure(Txt.err("Langues disponibles : fr, en."));
+                                return 0;
+                            }
+                            Vocab.broadcast();
+                            CommandAliases.refresh(c.getSource().getServer());
+                            c.getSource().sendSuccess(() -> Txt.ok("Langue des messages : " + l + " (appliquée immédiatement, sans reload)"), true);
+                            return 1;
+                        })));
+
+        // Historique de la saison
+        root.then(Commands.literal("history")
+                .executes(c -> showHistory(c, null, 1))
+                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                        .executes(c -> showHistory(c, null, IntegerArgumentType.getInteger(c, "page"))))
+                .then(Commands.literal("archive")
+                        .then(Commands.argument("nom", StringArgumentType.word())
+                                .suggests((c, b) -> SharedSuggestionProvider.suggest(SeasonHistory.archives(), b))
+                                .executes(c -> showHistory(c, StringArgumentType.getString(c, "nom"), 1))
+                                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                                        .executes(c -> showHistory(c, StringArgumentType.getString(c, "nom"),
+                                                IntegerArgumentType.getInteger(c, "page")))))));
+        root.then(Commands.literal("season")
+                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                .executes(c -> {
+                    c.getSource().sendSuccess(() -> Txt.info("Saison en cours : " + SeasonHistory.data().season
+                            + " (" + SeasonHistory.data().events.size() + " événements, depuis le " + SeasonHistory.data().startedAt + ")"), false);
+                    return 1;
+                })
+                .then(Commands.literal("new")
+                        .then(Commands.argument("nom", StringArgumentType.greedyString())
+                                .executes(c -> {
+                                    String old = SeasonHistory.data().season;
+                                    SeasonHistory.newSeason(StringArgumentType.getString(c, "nom"));
+                                    c.getSource().sendSuccess(() -> Txt.ok("« " + old + " » archivée. Nouvelle saison : "
+                                            + SeasonHistory.data().season + "."), true);
+                                    return 1;
+                                }))));
+
         // Abandon volontaire (avec confirmation) et retour d'un elimine
-        root.then(Commands.literal("abandon")
+        root.then(Commands.literal("giveup")
                 .executes(c -> {
                     String err = PlayerStatus.askAbandon(c.getSource().getPlayerOrException());
                     if (err != null) {
@@ -384,6 +434,7 @@ public final class KLCommand {
             }
         }
         dispatcher.register(root);
+        CommandAliases.install(dispatcher);
         // Alias court : /base = /ccis base
         dispatcher.register(Commands.literal("base").executes(KLCommand::goBase));
     }
@@ -1016,14 +1067,18 @@ public final class KLCommand {
             new HelpEntry("/ccis decline", "Refuser une épreuve (boutons du chat)", KLPermissions.NONE),
             new HelpEntry("/ccis vote", "Rouvrir le menu de vote {v_du_conseil}", KLPermissions.NONE),
             new HelpEntry("/admin <message>", "Écrire à l'organisation (seul message privé autorisé)", KLPermissions.NONE),
-            new HelpEntry("/ccis orga <joueur> <réponse>", "Répondre en privé à un joueur", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis reply <joueur> <réponse>", "Répondre en privé à un joueur", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis chat global <on|off>", "ON : tout le monde se lit / OFF : chat par équipe", KLPermissions.ADMIN),
-            new HelpEntry("/ccis abandon", "Abandonner l'aventure (avec confirmation) : tu deviens spectateur", KLPermissions.NONE),
+            new HelpEntry("/ccis language <fr|en>", "Langue des messages du mod (français / anglais)", KLPermissions.ADMIN),
+            new HelpEntry("/ccis history [page]", "Historique de la saison (éliminations, colliers, fusion...)", KLPermissions.NONE),
+            new HelpEntry("/ccis history archive <saison>", "Relire une saison archivée", KLPermissions.NONE),
+            new HelpEntry("/ccis season new <nom>", "Archive la saison en cours et en commence une nouvelle", KLPermissions.ADMIN),
+            new HelpEntry("/ccis giveup", "Abandonner l'aventure (avec confirmation) : tu deviens spectateur", KLPermissions.NONE),
             new HelpEntry("/ccis revive <joueur> [équipe]", "Remet un éliminé ou un abandon en jeu : choisis son équipe en cliquant dans le chat (il quitte l'ancienne)", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis base  (ou /base)", "Retourner à la base de ton équipe (impossible pendant une épreuve)", KLPermissions.NONE),
             new HelpEntry("/ccis ranking", "Classement général des victoires", KLPermissions.NONE),
             new HelpEntry("/ccis ranking jeu <jeu>", "Classement d'un jeu", KLPermissions.NONE),
-            new HelpEntry("/ccis ranking joueur <pseudo>", "Victoires d'un joueur", KLPermissions.NONE),
+            new HelpEntry("/ccis ranking player <pseudo>", "Victoires d'un joueur", KLPermissions.NONE),
             // Organisateurs
             new HelpEntry("/ccis games", "Liste des épreuves et leur état", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis start <jeu>", "Envoie les invitations d'une épreuve", KLPermissions.ORGANISATEUR),
@@ -1033,10 +1088,10 @@ public final class KLCommand {
             new HelpEntry("/ccis team list|add|remove|name|tag|color", "Gérer les équipes", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis poteaux zone pos1|pos2|info", "Zone d'eau des poteaux", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis poteaux check", "Qui est sur un poteau ?", KLPermissions.ORGANISATEUR),
-            new HelpEntry("/ccis conseil start|test <équipe>", "Lancer {v_un_conseil} (ou un test)", KLPermissions.ORGANISATEUR),
-            new HelpEntry("/ccis conseil menu|status", "Menu et état {v_du_conseil}", KLPermissions.ORGANISATEUR),
-            new HelpEntry("/ccis conseil vote close|reveal|revote|close|cancel", "Piloter {v_le_conseil}", KLPermissions.ORGANISATEUR),
-            new HelpEntry("/ccis conseil immunite <joueur>", "Activer ou retirer l'immunité", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis council start|test <équipe>", "Lancer {v_un_conseil} (ou un test)", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis council menu|status", "Menu et état {v_du_conseil}", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis council vote close|reveal|revote|close|cancel", "Piloter {v_le_conseil}", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis council immunity <joueur>", "Activer ou retirer l'immunité", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis campfire status|tp <équipe>", "État des feux de camp, se téléporter à un feu", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis say <message>", "Annonce visible par tout le monde", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis placeholder <texte>", "Tester les placeholders", KLPermissions.ORGANISATEUR),
@@ -1046,13 +1101,13 @@ public final class KLCommand {
             new HelpEntry("/ccis role set|get <joueur> [rôle]", "Gérer les rôles (participant, spectateur, organisateur)", KLPermissions.ADMIN),
             new HelpEntry("/ccis enable|disable <jeu>", "Activer ou désactiver un jeu", KLPermissions.ADMIN),
             new HelpEntry("/ccis campfire set|remove|fuel <équipe>", "Définir (en regardant le feu), retirer, régler la jauge", KLPermissions.ADMIN),
-            new HelpEntry("/ccis fusion [nom]", "{v_reunification} (à la main) : crée l'équipe unique, y met tout le monde et annonce", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis merge [nom]", "{v_reunification} (à la main) : crée l'équipe unique, y met tout le monde et annonce", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis team create <id> <couleur>", "Crée une équipe (autant que de couleurs, minimum 2 en jeu)", KLPermissions.ADMIN),
             new HelpEntry("/ccis team delete <équipe>", "Supprime une équipe (il en faut au moins 2)", KLPermissions.ADMIN),
             new HelpEntry("/ccis team unmerge", "Retour aux équipes séparées", KLPermissions.ADMIN),
             new HelpEntry("/ccis spawn set|tp|list", "Zone de jeu des équipes, {v_le_conseil}, {v_elimination}", KLPermissions.ADMIN),
             new HelpEntry("/ccis spawn base|respawn set|tp <équipe>", "Base et respawn (mort) des équipes", KLPermissions.ADMIN),
-            new HelpEntry("/ccis spawn jeu <jeu> <équipe>", "Point d'équipe propre à un jeu", KLPermissions.ADMIN),
+            new HelpEntry("/ccis spawn game <jeu> <équipe>", "Point d'équipe propre à un jeu", KLPermissions.ADMIN),
             new HelpEntry("/ccis ranking reset|add", "Remise à zéro et corrections du classement", KLPermissions.ADMIN));
 
     private static int help(CommandContext<CommandSourceStack> ctx) {
@@ -1255,6 +1310,54 @@ public final class KLCommand {
         TeamManager.unmerge();
         ctx.getSource().sendSuccess(() -> Txt.ok(
                 "Équipe de fusion supprimée. Ses joueurs n'ont plus d'équipe : réassigne-les avec /ccis team add."), true);
+        return 1;
+    }
+
+    private static final int HISTORY_PAGE = 10;
+
+    private static int showHistory(CommandContext<CommandSourceStack> ctx, String archive, int page) {
+        SeasonHistory.Data d = archive == null ? SeasonHistory.data() : SeasonHistory.readArchive(archive);
+        CommandSourceStack src = ctx.getSource();
+        if (d == null) {
+            src.sendFailure(Txt.err("Archive introuvable : " + archive));
+            return 0;
+        }
+        int total = d.events.size();
+        int pages = Math.max(1, (total + HISTORY_PAGE - 1) / HISTORY_PAGE);
+        int p = Math.min(page, pages);
+        src.sendSuccess(() -> Txt.lit("══ Historique : " + d.season + " ══").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+        if (total == 0) {
+            src.sendSuccess(() -> Txt.lit("Rien pour le moment.").withStyle(ChatFormatting.GRAY), false);
+            return 1;
+        }
+        int from = total - (p - 1) * HISTORY_PAGE; // plus recent en haut
+        int to = Math.max(0, from - HISTORY_PAGE);
+        for (int i = from - 1; i >= to; i--) {
+            SeasonHistory.Event e = d.events.get(i);
+            ChatFormatting color = switch (e.type) {
+                case "elimination", "abandon", "defusion" -> ChatFormatting.RED;
+                case "collier", "retour", "epreuve" -> ChatFormatting.GREEN;
+                case "egalite" -> ChatFormatting.YELLOW;
+                case "fusion" -> ChatFormatting.LIGHT_PURPLE;
+                default -> ChatFormatting.WHITE;
+            };
+            String icon = switch (e.type) {
+                case "elimination" -> "\u2620 ";
+                case "abandon" -> "\u2718 ";
+                case "collier" -> "\u25C6 ";
+                case "retour" -> "\u2714 ";
+                case "epreuve" -> "\u2605 ";
+                case "egalite" -> "\u2696 ";
+                case "fusion", "defusion" -> "\u2726 ";
+                default -> "\u25B8 ";
+            };
+            MutableComponent line = Component.empty()
+                    .append(Component.literal(e.date + " ").withStyle(ChatFormatting.DARK_GRAY))
+                    .append(Component.literal(icon).withStyle(color))
+                    .append(Txt.lit(e.text).withStyle(color));
+            src.sendSuccess(() -> line, false);
+        }
+        src.sendSuccess(() -> Txt.lit("Page " + p + "/" + pages + (pages > 1 ? "  — /ccis history <page>" : "")).withStyle(ChatFormatting.DARK_GRAY), false);
         return 1;
     }
 }

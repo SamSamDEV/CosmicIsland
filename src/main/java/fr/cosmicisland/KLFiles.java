@@ -74,12 +74,14 @@ public final class KLFiles {
     /** Recharge tous les fichiers du mod (utilise au demarrage et par /ccis reload). */
     public static void loadAll() {
         CosmicIsland.LOGGER.info("Cosmic Island - dossier de config : {}", dir().toAbsolutePath());
+        Lang.load();
         fr.cosmicisland.Vocab.load();
         KLPermissions.load();
         RoleManager.load();
         TeamManager.load();
         SpawnManager.load();
         RankingManager.load();
+        SeasonHistory.load();
         ConseilManager.load();
         ChatManager.load();
         CampfireManager.load();
