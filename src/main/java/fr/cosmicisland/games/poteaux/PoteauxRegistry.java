@@ -21,14 +21,14 @@ public final class PoteauxRegistry {
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(ForgeRegistries.ITEMS, CosmicIsland.MODID);
 
-    public static final RegistryObject<Block> POTEAU = BLOCKS.register("poteau",
+    public static final RegistryObject<Block> POTEAU = BLOCKS.register("pole",
             () -> new PoteauBlock(BlockBehaviour.Properties.of()
                     .mapColor(MapColor.WOOD)
                     .strength(2.0f)
                     .sound(SoundType.WOOD)
                     .noOcclusion()));
 
-    public static final RegistryObject<Item> POTEAU_ITEM = ITEMS.register("poteau",
+    public static final RegistryObject<Item> POTEAU_ITEM = ITEMS.register("pole",
             () -> new BlockItem(POTEAU.get(), new Item.Properties()));
 
     private PoteauxRegistry() {}

@@ -1,0 +1,1451 @@
+{
+ "tree": [
+  {
+   "id": "season",
+   "pages": [
+    {
+     "id": "overview",
+     "w": [
+      {
+       "t": "info",
+       "src": "season"
+      },
+      {
+       "t": "h",
+       "l": "overview.1"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "overview.2",
+         "c": "ccis season start"
+        },
+        {
+         "l": "overview.3",
+         "c": "ccis season pause"
+        },
+        {
+         "l": "overview.4",
+         "c": "ccis season resume"
+        },
+        {
+         "l": "overview.5",
+         "c": "ccis season end",
+         "x": 1,
+         "d": 1
+        },
+        {
+         "l": "overview.6",
+         "c": "ccis season reset confirm",
+         "x": 1,
+         "d": 1,
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "l": "overview.7"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "overview.8",
+         "c": "ccis season day next"
+        },
+        {
+         "l": "overview.9",
+         "c": "ccis season step next"
+        },
+        {
+         "l": "overview.10",
+         "c": "ccis season jury"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "overview.11",
+       "c": "ccis season day {day}",
+       "f": [
+        {
+         "n": "day",
+         "k": "int",
+         "min": 1,
+         "max": 999
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "overview.12",
+       "c": "ccis season auto {enabled}",
+       "f": [
+        {
+         "n": "enabled",
+         "k": "choice",
+         "src": "bool"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "overview.13",
+       "c": "ccis season phase {phase}",
+       "f": [
+        {
+         "n": "phase",
+         "k": "choice",
+         "src": "phases"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "overview.14",
+       "c": "ccis season step {step}",
+       "f": [
+        {
+         "n": "step",
+         "k": "choice",
+         "src": "steps"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "setup",
+     "w": [
+      {
+       "t": "text",
+       "l": "setup.1"
+      },
+      {
+       "t": "form",
+       "l": "setup.2",
+       "c": "ccis season setup {teams} {players}",
+       "f": [
+        {
+         "n": "teams",
+         "k": "int",
+         "min": 2,
+         "max": 8
+        },
+        {
+         "n": "players",
+         "k": "int",
+         "min": 4,
+         "max": 200
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "setup.3",
+       "c": "ccis season mergeat {players}",
+       "f": [
+        {
+         "n": "players",
+         "k": "int",
+         "min": 0,
+         "max": 200
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "setup.4",
+       "c": "ccis season finaleat {players}",
+       "f": [
+        {
+         "n": "players",
+         "k": "int",
+         "min": 0,
+         "max": 200
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "testing",
+     "w": [
+      {
+       "t": "text",
+       "l": "testing.1"
+      },
+      {
+       "t": "form",
+       "l": "testing.2",
+       "c": "ccis season fake {count}",
+       "f": [
+        {
+         "n": "count",
+         "k": "int",
+         "min": 1,
+         "max": 40
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "testing.3",
+         "c": "ccis season fake clear",
+         "x": 1,
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "l": "testing.4"
+      },
+      {
+       "t": "text",
+       "l": "testing.5"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "testing.6",
+         "c": "ccis season simulate run",
+         "x": 1,
+         "d": 1,
+         "a": 1
+        },
+        {
+         "l": "testing.7",
+         "c": "ccis season simulate stop",
+         "x": 1,
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "testing.8",
+       "c": "ccis season simulate run {players} {teams} {mergeat}",
+       "f": [
+        {
+         "n": "players",
+         "k": "int",
+         "min": 5,
+         "max": 40
+        },
+        {
+         "n": "teams",
+         "k": "int",
+         "min": 2,
+         "max": 8
+        },
+        {
+         "n": "mergeat",
+         "k": "int",
+         "min": 4,
+         "max": 40
+        }
+       ],
+       "x": 1,
+       "d": 1,
+       "a": 1
+      }
+     ]
+    },
+    {
+     "id": "history",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "history.1",
+         "c": "ccis history"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "history.2",
+       "c": "ccis history {page}",
+       "f": [
+        {
+         "n": "page",
+         "k": "int",
+         "min": 1,
+         "max": 999
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "history.3",
+       "c": "ccis history archive {name} {page}",
+       "f": [
+        {
+         "n": "name",
+         "k": "choice",
+         "src": "archives"
+        },
+        {
+         "n": "page",
+         "k": "int",
+         "min": 1,
+         "max": 999
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "history.4",
+       "c": "ccis history new {name}",
+       "f": [
+        {
+         "n": "name",
+         "k": "greedy"
+        }
+       ],
+       "x": 1,
+       "a": 1
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "history.5",
+         "c": "ccis history clear confirm",
+         "x": 1,
+         "d": 1,
+         "a": 1
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "people",
+   "pages": [
+    {
+     "id": "players",
+     "w": [
+      {
+       "t": "info",
+       "src": "players"
+      },
+      {
+       "t": "form",
+       "l": "players.1",
+       "c": "ccis role set {player} {role}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        },
+        {
+         "n": "role",
+         "k": "choice",
+         "src": "roles"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "players.2",
+       "c": "ccis role get {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "players.3",
+       "c": "ccis revive {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "teams",
+     "w": [
+      {
+       "t": "info",
+       "src": "teams"
+      },
+      {
+       "t": "h",
+       "l": "teams.1"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "teams.2",
+         "c": "ccis team draw"
+        },
+        {
+         "l": "teams.3",
+         "c": "ccis team draw all",
+         "x": 1
+        },
+        {
+         "l": "teams.4",
+         "c": "ccis team merge",
+         "x": 1
+        },
+        {
+         "l": "teams.5",
+         "c": "ccis team unmerge",
+         "x": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "teams.6",
+       "c": "ccis team merge {name}",
+       "f": [
+        {
+         "n": "name",
+         "k": "greedy"
+        }
+       ],
+       "x": 1
+      },
+      {
+       "t": "h",
+       "l": "teams.7"
+      },
+      {
+       "t": "form",
+       "l": "teams.8",
+       "c": "ccis team add {team} {player}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        },
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "teams.9",
+       "c": "ccis team remove {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "l": "teams.10"
+      },
+      {
+       "t": "form",
+       "l": "teams.11",
+       "c": "ccis team create {id} {color}",
+       "f": [
+        {
+         "n": "id",
+         "k": "word"
+        },
+        {
+         "n": "color",
+         "k": "choice",
+         "src": "colors"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "teams.12",
+       "c": "ccis team delete {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "x": 1,
+       "d": 1,
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "teams.13",
+       "c": "ccis team name {team} {text}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        },
+        {
+         "n": "text",
+         "k": "greedy"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "teams.14",
+       "c": "ccis team tag {team} {text}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        },
+        {
+         "n": "text",
+         "k": "greedy"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "teams.15",
+       "c": "ccis team color {team} {color}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        },
+        {
+         "n": "color",
+         "k": "choice",
+         "src": "colors"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "ranking",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "ranking.1",
+         "c": "ccis ranking"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "ranking.2",
+       "c": "ccis ranking game {game}",
+       "f": [
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "ranking.3",
+       "c": "ccis ranking player {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "ranking.4",
+       "c": "ccis ranking add {player} {game} {count}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        },
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        },
+        {
+         "n": "count",
+         "k": "int",
+         "min": -100,
+         "max": 100
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "ranking.5",
+       "c": "ccis ranking reset {target}",
+       "f": [
+        {
+         "n": "target",
+         "k": "text"
+        }
+       ],
+       "x": 1,
+       "d": 1,
+       "a": 1
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "ranking.6",
+         "c": "ccis ranking reset confirm",
+         "x": 1,
+         "d": 1,
+         "a": 1
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "council",
+   "pages": [
+    {
+     "id": "council",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "council.1",
+         "c": "ccis council menu"
+        },
+        {
+         "l": "council.2",
+         "c": "ccis council status"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "council.3",
+       "c": "ccis council start {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "x": 1
+      },
+      {
+       "t": "h",
+       "l": "council.4"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "council.5",
+         "c": "ccis council vote close",
+         "x": 1
+        },
+        {
+         "l": "council.6",
+         "c": "ccis council reveal"
+        },
+        {
+         "l": "council.7",
+         "c": "ccis council revote",
+         "x": 1
+        },
+        {
+         "l": "council.8",
+         "c": "ccis council close",
+         "x": 1
+        },
+        {
+         "l": "council.9",
+         "c": "ccis council cancel",
+         "x": 1,
+         "d": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "council.10",
+       "c": "ccis council immunity {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "council.11",
+       "c": "ccis council test {team} {count}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        },
+        {
+         "n": "count",
+         "k": "int",
+         "min": 1,
+         "max": 20
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "finale",
+     "w": [
+      {
+       "t": "info",
+       "src": "finale"
+      },
+      {
+       "t": "text",
+       "l": "finale.1"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "finale.2",
+         "c": "ccis finale start",
+         "x": 1
+        },
+        {
+         "l": "finale.3",
+         "c": "ccis finale jury"
+        },
+        {
+         "l": "finale.4",
+         "c": "ccis finale status"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "finale.5",
+       "c": "ccis finale winner {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "finale.6",
+       "c": "ccis finale pick {player}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "l": "finale.7"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "finale.8",
+         "c": "ccis finale vote start",
+         "x": 1
+        },
+        {
+         "l": "finale.9",
+         "c": "ccis finale reveal",
+         "x": 1
+        },
+        {
+         "l": "finale.10",
+         "c": "ccis finale reset",
+         "x": 1,
+         "d": 1,
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "l": "finale.11"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "finale.12",
+         "c": "ccis finale simulate",
+         "a": 1
+        },
+        {
+         "l": "finale.13",
+         "c": "ccis finale simulate stop",
+         "x": 1,
+         "a": 1
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "games",
+   "pages": [
+    {
+     "id": "games",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "games.1",
+         "c": "ccis games"
+        },
+        {
+         "l": "games.2",
+         "c": "ccis go"
+        },
+        {
+         "l": "games.3",
+         "c": "ccis freeze"
+        },
+        {
+         "l": "games.4",
+         "c": "ccis unfreeze"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "games.5",
+       "c": "ccis enable {game}",
+       "f": [
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "games.6",
+       "c": "ccis disable {game}",
+       "f": [
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "games.7",
+       "c": "ccis start {game}",
+       "f": [
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        }
+       ],
+       "x": 1
+      },
+      {
+       "t": "form",
+       "l": "games.8",
+       "c": "ccis stop {game}",
+       "f": [
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        }
+       ],
+       "x": 1,
+       "d": 1
+      }
+     ]
+    },
+    {
+     "id": "balance",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "balance.1",
+         "c": "ccis balance",
+         "x": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "balance.2",
+       "c": "ccis balance {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "x": 1
+      },
+      {
+       "t": "form",
+       "l": "balance.3",
+       "c": "ccis balance test {players}",
+       "f": [
+        {
+         "n": "players",
+         "k": "int",
+         "min": 2,
+         "max": 10
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "balance.4",
+       "c": "ccis placeholder {text}",
+       "f": [
+        {
+         "n": "text",
+         "k": "greedy"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "camp",
+   "pages": [
+    {
+     "id": "campfires",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "campfires.1",
+         "c": "ccis campfire status"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "campfires.2",
+       "c": "ccis campfire tp {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "campfires.3",
+       "c": "ccis campfire set {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "campfires.4",
+       "c": "ccis campfire remove {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "x": 1,
+       "d": 1,
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "campfires.5",
+       "c": "ccis campfire fuel {team} {value}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        },
+        {
+         "n": "value",
+         "k": "dbl",
+         "min": 0,
+         "max": 100000
+        }
+       ],
+       "a": 1
+      }
+     ]
+    },
+    {
+     "id": "spawns",
+     "w": [
+      {
+       "t": "text",
+       "l": "spawns.1"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "spawns.2",
+         "c": "ccis spawn list",
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "spawns.3",
+       "c": "ccis spawn set {spawn}",
+       "f": [
+        {
+         "n": "spawn",
+         "k": "choice",
+         "src": "spawns"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "spawns.4",
+       "c": "ccis spawn tp {spawn}",
+       "f": [
+        {
+         "n": "spawn",
+         "k": "choice",
+         "src": "spawns"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "spawns.5",
+       "c": "ccis spawn base set {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "spawns.6",
+       "c": "ccis spawn base tp {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "spawns.7",
+       "c": "ccis spawn respawn set {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "spawns.8",
+       "c": "ccis spawn respawn tp {team}",
+       "f": [
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "spawns.9",
+       "c": "ccis spawn game {game} {team}",
+       "f": [
+        {
+         "n": "game",
+         "k": "choice",
+         "src": "games"
+        },
+        {
+         "n": "team",
+         "k": "choice",
+         "src": "teams"
+        }
+       ],
+       "a": 1
+      }
+     ]
+    },
+    {
+     "id": "survival",
+     "w": [
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "survival.1",
+         "c": "ccis thirst"
+        },
+        {
+         "l": "survival.2",
+         "c": "ccis thirst on",
+         "a": 1
+        },
+        {
+         "l": "survival.3",
+         "c": "ccis thirst off",
+         "x": 1,
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "survival.4",
+       "c": "ccis thirst set {player} {value}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        },
+        {
+         "n": "value",
+         "k": "int",
+         "min": 0,
+         "max": 100
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "survival.5",
+       "c": "ccis give {item} {player} {count}",
+       "f": [
+        {
+         "n": "item",
+         "k": "choice",
+         "src": "items"
+        },
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        },
+        {
+         "n": "count",
+         "k": "int",
+         "min": 1,
+         "max": 64
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "food",
+     "w": [
+      {
+       "t": "text",
+       "l": "food.1"
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "food.2",
+         "c": "ccis food info"
+        },
+        {
+         "l": "food.3",
+         "c": "ccis food remove",
+         "x": 1,
+         "a": 1
+        },
+        {
+         "l": "food.4",
+         "c": "ccis food list"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "food.5",
+       "c": "ccis food set {hydration}",
+       "f": [
+        {
+         "n": "hydration",
+         "k": "int",
+         "min": -20,
+         "max": 20
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "food.6",
+       "c": "ccis food set {hydration} {saturation} {chance}",
+       "f": [
+        {
+         "n": "hydration",
+         "k": "int",
+         "min": -20,
+         "max": 20
+        },
+        {
+         "n": "saturation",
+         "k": "dbl",
+         "min": 0,
+         "max": 20
+        },
+        {
+         "n": "chance",
+         "k": "int",
+         "min": 0,
+         "max": 100
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "food.7",
+       "c": "ccis food tag {tag} {hydration}",
+       "f": [
+        {
+         "n": "tag",
+         "k": "word"
+        },
+        {
+         "n": "hydration",
+         "k": "int",
+         "min": -20,
+         "max": 20
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "food.8",
+       "c": "ccis food tag {tag} {hydration} {saturation} {chance}",
+       "f": [
+        {
+         "n": "tag",
+         "k": "word"
+        },
+        {
+         "n": "hydration",
+         "k": "int",
+         "min": -20,
+         "max": 20
+        },
+        {
+         "n": "saturation",
+         "k": "dbl",
+         "min": 0,
+         "max": 20
+        },
+        {
+         "n": "chance",
+         "k": "int",
+         "min": 0,
+         "max": 100
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "form",
+       "l": "food.9",
+       "c": "ccis food tag remove {tag}",
+       "f": [
+        {
+         "n": "tag",
+         "k": "word"
+        }
+       ],
+       "x": 1,
+       "a": 1
+      }
+     ]
+    },
+    {
+     "id": "settings",
+     "w": [
+      {
+       "t": "form",
+       "l": "settings.1",
+       "c": "ccis language {lang}",
+       "f": [
+        {
+         "n": "lang",
+         "k": "choice",
+         "src": "langs"
+        }
+       ],
+       "a": 1
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "settings.2",
+         "c": "ccis reload",
+         "x": 1,
+         "a": 1
+        },
+        {
+         "l": "settings.3",
+         "c": "ccis help"
+        },
+        {
+         "l": "settings.4",
+         "c": "ccis info"
+        }
+       ]
+      },
+      {
+       "t": "btns",
+       "b": [
+        {
+         "l": "settings.5",
+         "c": "ccis chat global on",
+         "a": 1
+        },
+        {
+         "l": "settings.6",
+         "c": "ccis chat global off",
+         "a": 1
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "settings.7",
+       "c": "ccis say {text}",
+       "f": [
+        {
+         "n": "text",
+         "k": "greedy"
+        }
+       ]
+      },
+      {
+       "t": "form",
+       "l": "settings.8",
+       "c": "ccis reply {player} {message}",
+       "f": [
+        {
+         "n": "player",
+         "k": "choice",
+         "src": "players"
+        },
+        {
+         "n": "message",
+         "k": "greedy"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

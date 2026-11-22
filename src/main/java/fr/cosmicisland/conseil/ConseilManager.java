@@ -803,6 +803,8 @@ public final class ConseilManager {
             int got = tally.getOrDefault(out, 0);
             fr.cosmicisland.SeasonHistory.log("elimination", plainName(outName) + " est éliminé (" + got + " vote" + (got > 1 ? "s" : "")
                     + ") au conseil de l'équipe " + teamName() + ".");
+            fr.cosmicisland.FinaleManager.addJuror(out, outName);
+            fr.cosmicisland.SeasonManager.onElimination(net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer());
         }
         writeLog("closed", outName);
         notifyStaff("{v_conseil} clos : &f" + outName + (test
@@ -1097,7 +1099,7 @@ public final class ConseilManager {
     private static final String STATE_FILE = "state/conseil.json";
 
     private static java.nio.file.Path stateFile() {
-        return KLFiles.dir().resolve(STATE_FILE);
+        return KLFiles.path(STATE_FILE);
     }
 
     private static void deleteState() {

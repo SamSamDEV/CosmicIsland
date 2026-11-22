@@ -1,6 +1,7 @@
 {
-  "replace": false,
-  "values": [
-    "cosmicisland:poteau"
-  ]
+ "replace": false,
+ "values": [
+  "cosmicisland:pole",
+  "cosmicisland:team_campfire"
+ ]
 }

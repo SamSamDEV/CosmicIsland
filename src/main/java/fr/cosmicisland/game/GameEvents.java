@@ -34,6 +34,7 @@ public class GameEvents {
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             GameManager.tick();
+            BalanceRoulette.tick();
             ConseilManager.tick();
             CampfireManager.tick();
         }

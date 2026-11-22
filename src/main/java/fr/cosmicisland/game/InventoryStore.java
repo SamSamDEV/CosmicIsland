@@ -27,7 +27,7 @@ public final class InventoryStore {
     private InventoryStore() {}
 
     private static Path file(UUID id) {
-        return KLFiles.dir().resolve("saved").resolve(id + ".nbt");
+        return KLFiles.path("saved").resolve(id + ".nbt");
     }
 
     public static boolean has(UUID id) {

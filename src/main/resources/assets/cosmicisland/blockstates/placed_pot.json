@@ -1,0 +1,13 @@
+{
+ "variants": {
+  "state=0": {
+   "model": "cosmicisland:block/marmite_posee_empty"
+  },
+  "state=1": {
+   "model": "cosmicisland:block/marmite_posee_water"
+  },
+  "state=2": {
+   "model": "cosmicisland:block/marmite_posee_rice"
+  }
+ }
+}

@@ -25,12 +25,20 @@ public final class CosmicTab {
         event.register(Registries.CREATIVE_MODE_TAB, helper -> helper.register(
                 new ResourceLocation(CosmicIsland.MODID, "cosmicisland"),
                 CreativeModeTab.builder()
-                        .title(Component.translatable("itemGroup.cosmicisland"))
+                        .title(Tr.c("itemGroup.cosmicisland"))
                         .icon(() -> new ItemStack(TotemRegistry.TOTEM_ITEM != null
                                 ? TotemRegistry.TOTEM_ITEM : ConseilRegistry.COLLIER.get()))
                         .displayItems((params, output) -> {
                             output.accept(PoteauxRegistry.POTEAU_ITEM.get());
                             output.accept(ConseilRegistry.COLLIER.get());
+                            ItemStack gourde = new ItemStack(fr.cosmicisland.survival.SurvivalRegistry.GOURDE.get());
+                            fr.cosmicisland.survival.GourdeItem.setSips(gourde, fr.cosmicisland.survival.GourdeItem.maxSips(), false);
+                            output.accept(gourde);
+                            output.accept(new ItemStack(fr.cosmicisland.survival.SurvivalRegistry.MARMITE.get()));
+                            output.accept(new ItemStack(fr.cosmicisland.survival.SurvivalRegistry.SAC_RIZ.get()));
+                            output.accept(new ItemStack(fr.cosmicisland.survival.SurvivalRegistry.COQUILLAGE_RIZ.get()));
+                            output.accept(new ItemStack(fr.cosmicisland.survival.SurvivalRegistry.FEU_ITEM.get()));
+                            output.accept(new ItemStack(fr.cosmicisland.survival.SurvivalRegistry.ALLUME_FEU.get()));
                             if (TotemRegistry.TOTEM_ITEM != null) {
                                 output.accept(TotemRegistry.TOTEM_ITEM);
                             }

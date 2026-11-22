@@ -70,6 +70,56 @@ public final class RoleManager {
         apply(player, effective(player));
     }
 
+    private static UUID fakeId(String name) {
+        return UUID.nameUUIDFromBytes(("fake-participant-" + name).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /** TEST : cree n faux participants (Test1, Test2...). Retourne le nombre cree. */
+    public static int addFakes(int n) {
+        int created = 0;
+        for (int i = 1; i <= n; i++) {
+            String name = "Test" + i;
+            UUID id = fakeId(name);
+            if (!store.players.containsKey(id.toString())) {
+                created++;
+            }
+            Entry entry = new Entry();
+            entry.name = name;
+            entry.role = KLRole.PARTICIPANT;
+            store.players.put(id.toString(), entry);
+        }
+        save();
+        return created;
+    }
+
+    /** TEST : supprime tous les faux participants (aussi de leur equipe). Retourne le nombre supprime. */
+    public static int clearFakes() {
+        int removed = 0;
+        java.util.Iterator<Map.Entry<String, Entry>> it = store.players.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Entry> e = it.next();
+            if (e.getValue().name != null && e.getValue().name.matches("Test[0-9]+")
+                    && e.getKey().equals(fakeId(e.getValue().name).toString())) {
+                TeamManager.remove(new GameProfile(UUID.fromString(e.getKey()), e.getValue().name));
+                it.remove();
+                removed++;
+            }
+        }
+        save();
+        return removed;
+    }
+
+    /** Tous les joueurs enregistres : [{n: pseudo, r: role, u: uuid}] (fenetre d'administration). */
+    public static java.util.List<String[]> registered() {
+        java.util.List<String[]> list = new java.util.ArrayList<>();
+        for (Map.Entry<String, Entry> e : store.players.entrySet()) {
+            if (e.getValue().name != null && e.getValue().role != null) {
+                list.add(new String[]{e.getValue().name, e.getValue().role.id(), e.getKey()});
+            }
+        }
+        return list;
+    }
+
     /** Joueurs enregistres avec le role participant (uuid -> pseudo). */
     public static Map<UUID, String> participants() {
         Map<UUID, String> map = new LinkedHashMap<>();

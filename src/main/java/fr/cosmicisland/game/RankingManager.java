@@ -260,12 +260,12 @@ public final class RankingManager {
     /** Copie de securite de ranking.json dans backups/. Retourne le chemin relatif ou null. */
     private static String backup() {
         save();
-        Path source = KLFiles.dir().resolve("ranking.json");
+        Path source = KLFiles.path("ranking.json");
         if (!Files.exists(source)) {
             return null;
         }
         String name = "ranking_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".json";
-        Path dir = KLFiles.dir().resolve("backups");
+        Path dir = KLFiles.path("backups");
         try {
             Files.createDirectories(dir);
             Files.copy(source, dir.resolve(name), StandardCopyOption.REPLACE_EXISTING);

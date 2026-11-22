@@ -1,0 +1,16 @@
+newmtl wood
+Kd 1 1 1
+map_Kd #wood
+
+newmtl groove
+Kd 1 1 1
+map_Kd #groove
+
+newmtl bark
+Kd 1 1 1
+map_Kd #bark
+
+newmtl char
+Kd 1 1 1
+map_Kd #char
+

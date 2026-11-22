@@ -1,0 +1,52 @@
+{
+ "multipart": [
+  {
+   "when": {
+    "lit": "false"
+   },
+   "apply": {
+    "model": "cosmicisland:block/feu_de_camp_unlit"
+   }
+  },
+  {
+   "when": {
+    "lit": "true"
+   },
+   "apply": {
+    "model": "cosmicisland:block/feu_de_camp_lit"
+   }
+  },
+  {
+   "when": {
+    "lit": "true"
+   },
+   "apply": {
+    "model": "cosmicisland:block/feu_flames"
+   }
+  },
+  {
+   "when": {
+    "pot": "1"
+   },
+   "apply": {
+    "model": "cosmicisland:block/feu_pot_empty"
+   }
+  },
+  {
+   "when": {
+    "pot": "2"
+   },
+   "apply": {
+    "model": "cosmicisland:block/feu_pot_water"
+   }
+  },
+  {
+   "when": {
+    "pot": "3"
+   },
+   "apply": {
+    "model": "cosmicisland:block/feu_pot_rice"
+   }
+  }
+ ]
+}

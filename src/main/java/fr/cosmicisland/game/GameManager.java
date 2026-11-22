@@ -269,6 +269,9 @@ public final class GameManager {
         if (state != State.INVITE && state != State.READY) {
             return "Aucune épreuve prête à démarrer (utilise /ccis start <jeu>).";
         }
+        if (BalanceRoulette.running()) {
+            return "La roulette est en cours : attends la fin du tirage.";
+        }
         if (joined.isEmpty()) {
             return "Personne n'a rejoint l'épreuve pour l'instant.";
         }
@@ -310,6 +313,8 @@ public final class GameManager {
         if (state == State.IDLE || server == null) {
             return;
         }
+        BalanceRoulette.cancel(server);
+        dispensed.clear();
         KLGame g = game;
         GameConfig c = cfg;
         boolean wasRunning = state == State.RUNNING;
@@ -336,7 +341,6 @@ public final class GameManager {
                 continue; // restaure automatiquement a la prochaine connexion
             }
             GameMessages.send(c, cancelled ? "stop" : "end", p);
-            CampfireManager.clearDebuff(p);
             // Fin d'epreuve : retour au point d'equipe de la zone de jeu (le joueur rentre ensuite avec /ccis base)
             String teamId = TeamManager.teamIdOf(id);
             SpawnManager.Spawn endSpawn = (c.endAtTeamSpawn && teamId != null)
@@ -451,11 +455,6 @@ public final class GameManager {
         if (cfg.showTimer && ticks % 20 == 0) {
             updateTimerBar();
         }
-        if (cfg.campfireDebuff && ticks % 20 == 0) {
-            for (ServerPlayer p : onlineParticipants()) {
-                CampfireManager.applyDebuff(p);
-            }
-        }
         if (cfg.reminderSeconds > 0 && ticks % (cfg.reminderSeconds * 20) == 0) {
             for (ServerPlayer p : onlineParticipants()) {
                 GameMessages.send(cfg, "reminder", p);
@@ -527,12 +526,144 @@ public final class GameManager {
         }
     }
 
+    // ------------------------------------------------------------ equilibrage des equipes (roulette)
+
+    private static final Set<UUID> dispensed = new LinkedHashSet<>();
+
+    /** Joueurs ayant rejoint, par equipe. */
+    private static Map<String, List<UUID>> joinedByTeam() {
+        Map<String, List<UUID>> map = new LinkedHashMap<>();
+        for (UUID id : joined) {
+            String team = TeamManager.teamIdOf(id);
+            if (team != null && server.getPlayerList().getPlayer(id) != null) {
+                map.computeIfAbsent(team, k -> new ArrayList<>()).add(id);
+            }
+        }
+        return map;
+    }
+
+    /** Equipes plus nombreuses que la plus petite : message pour le staff, ou null si equilibre. */
+    private static String imbalanceNote() {
+        Map<String, List<UUID>> by = joinedByTeam();
+        if (by.size() < 2) {
+            return null;
+        }
+        int min = by.values().stream().mapToInt(List::size).min().orElse(0);
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, List<UUID>> e : by.entrySet()) {
+            TeamManager.KLTeam t = TeamManager.get(e.getKey());
+            sb.append(t == null ? e.getKey() : t.name).append(" ").append(e.getValue().size()).append("  ");
+        }
+        boolean uneven = by.values().stream().anyMatch(l -> l.size() > min);
+        return uneven ? sb.toString().trim() : null;
+    }
+
+    /** Lance la roulette : dans chaque equipe trop nombreuse, des joueurs sont tires au sort et dispenses. */
+    public static String balance() {
+        return balance(null);
+    }
+
+    /** Comme balance(), mais limite a une equipe choisie (identifiant ou nom). */
+    public static String balance(String teamChoice) {
+        if (state != State.INVITE && state != State.READY) {
+            return "Aucune épreuve en préparation (équilibre les équipes avant /ccis go).";
+        }
+        if (BalanceRoulette.running()) {
+            return "La roulette est déjà en cours.";
+        }
+        if (TeamManager.isMerged()) {
+            return "Les équipes sont fusionnées : rien à équilibrer.";
+        }
+        Map<String, List<UUID>> by = joinedByTeam();
+        if (by.size() < 2) {
+            return "Il faut au moins 2 équipes avec des joueurs prêts.";
+        }
+        int min = by.values().stream().mapToInt(List::size).min().orElse(0);
+        List<BalanceRoulette.Draw> draws = new ArrayList<>();
+        if (teamChoice != null) {
+            String id = TeamManager.resolveId(teamChoice);
+            if (id == null) {
+                return "Équipe inconnue : " + teamChoice;
+            }
+            List<UUID> pool = by.get(id);
+            if (pool == null) {
+                return "Aucun joueur prêt dans cette équipe.";
+            }
+            int minOthers = by.entrySet().stream().filter(e -> !e.getKey().equals(id))
+                    .mapToInt(e -> e.getValue().size()).min().orElse(0);
+            if (pool.size() <= minOthers) {
+                return "Cette équipe n'est pas plus nombreuse que les autres (" + pool.size() + " contre " + minOthers + " au minimum).";
+            }
+            List<String> names = new ArrayList<>();
+            for (UUID u : pool) {
+                names.add(joinedNames.getOrDefault(u, "?"));
+            }
+            BalanceRoulette.start(List.of(new BalanceRoulette.Draw(id, new ArrayList<>(pool), names, 0)));
+            notifyStaff("Roulette lancée pour l'équipe &f" + TeamManager.get(id).name + "&7.");
+            return null;
+        }
+        for (Map.Entry<String, List<UUID>> e : by.entrySet()) {
+            List<UUID> pool = new ArrayList<>(e.getValue());
+            for (int excess = pool.size() - min; excess > 0; excess--) {
+                List<String> names = new ArrayList<>();
+                for (UUID id : pool) {
+                    names.add(joinedNames.getOrDefault(id, "?"));
+                }
+                draws.add(new BalanceRoulette.Draw(e.getKey(), new ArrayList<>(pool), names, excess - 1));
+                // le gagnant n'est connu qu'a la fin ; les tirages d'une meme equipe se font l'un apres l'autre
+                break;
+            }
+        }
+        if (draws.isEmpty()) {
+            return "Les équipes sont déjà équilibrées.";
+        }
+        // une equipe avec plusieurs en trop : on relance la roulette automatiquement apres chaque dispense
+        BalanceRoulette.start(draws);
+        notifyStaff("Roulette lancée (équipes à " + min + " joueur(s)).");
+        return null;
+    }
+
+    /** Retire un joueur de l'epreuve en cours (dispense) : inventaire rendu, retour a sa position d'avant. */
+    public static void dispense(UUID id) {
+        if (server == null || !joined.contains(id)) {
+            return;
+        }
+        String name = joinedNames.getOrDefault(id, "?");
+        String team = TeamManager.teamIdOf(id);
+        ServerPlayer p = server.getPlayerList().getPlayer(id);
+        joined.remove(id);
+        joinedNames.remove(id);
+        dispensed.add(id);
+        if (p != null) {
+            InventoryStore.restore(server, p, true);
+            p.sendSystemMessage(Txt.of("&6[Roulette] &7Tu es dispensé de cette épreuve pour équilibrer les équipes. Regarde bien !"));
+        }
+        fr.cosmicisland.SeasonHistory.log("epreuve", name + " est dispensé de " + (cfg == null ? "l'épreuve" : cfg.displayName) + " (équilibrage des équipes).");
+        // meme equipe encore trop nombreuse : nouveau tirage
+        Map<String, List<UUID>> by = joinedByTeam();
+        if (team != null && by.size() >= 2 && state != State.IDLE) {
+            int min = by.values().stream().mapToInt(List::size).min().orElse(0);
+            List<UUID> pool = by.getOrDefault(team, List.of());
+            if (pool.size() > min) {
+                List<String> names = new ArrayList<>();
+                for (UUID u : pool) {
+                    names.add(joinedNames.getOrDefault(u, "?"));
+                }
+                BalanceRoulette.enqueue(new BalanceRoulette.Draw(team, new ArrayList<>(pool), names, 0));
+            }
+        }
+    }
+
     // ------------------------------------------------------------ utilitaires
 
     private static void checkAllAnswered() {
         if (joined.size() + declined.size() >= invited.size()) {
             notifyStaff("Tous les joueurs ont répondu : &a" + joined.size()
                     + "&7 participant(s). Utilise &f/ccis go&7 pour lancer le décompte.");
+            String uneven = imbalanceNote();
+            if (uneven != null) {
+                notifyStaff("&eÉquipes inégales (" + uneven + ") : &f/ccis balance&7 lance la roulette pour équilibrer.");
+            }
         }
     }
 
@@ -550,8 +681,8 @@ public final class GameManager {
                 .withColor(color)
                 .withBold(true)
                 .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(hover)));
-        return Component.literal(label).withStyle(style);
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Txt.lit(hover)));
+        return Txt.lit(label).withStyle(style);
     }
 
     private static void giveKit(ServerPlayer player) {

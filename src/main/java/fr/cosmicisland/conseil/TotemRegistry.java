@@ -71,7 +71,7 @@ public final class TotemRegistry {
     public static void onRegister(RegisterEvent event) {
         event.register(ForgeRegistries.Keys.BLOCKS, helper -> {
             TOTEM_BLOCK = new TotemBlock();
-            helper.register(new ResourceLocation(CosmicIsland.MODID, "totem"), TOTEM_BLOCK);
+            helper.register(new ResourceLocation(CosmicIsland.MODID, "immunity_globe"), TOTEM_BLOCK);
         });
         event.register(ForgeRegistries.Keys.ITEMS, helper -> {
             if (TOTEM_BLOCK == null) {
@@ -88,7 +88,7 @@ public final class TotemRegistry {
                     return net.minecraft.network.chat.Component.literal(fr.cosmicisland.Vocab.nom("totem"));
                 }
             };
-            helper.register(new ResourceLocation(CosmicIsland.MODID, "totem"), TOTEM_ITEM);
+            helper.register(new ResourceLocation(CosmicIsland.MODID, "immunity_globe"), TOTEM_ITEM);
         });
     }
 

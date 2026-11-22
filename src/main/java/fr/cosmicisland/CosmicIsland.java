@@ -35,9 +35,13 @@ public class CosmicIsland {
         MinecraftForge.EVENT_BUS.register(new GameEvents());
         MinecraftForge.EVENT_BUS.register(new ChatEvents());
         MinecraftForge.EVENT_BUS.register(new CampfireEvents());
+        MinecraftForge.EVENT_BUS.register(new SeasonManager.Events());
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(fr.cosmicisland.season.SeasonNetwork::onSetup);
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(fr.cosmicisland.admin.AdminNetwork::onSetup);
         // Blocs et reseau des poteaux (bus d'evenements du mod)
         PoteauxRegistry.init(FMLJavaModLoadingContext.get().getModEventBus());
         ConseilRegistry.init(FMLJavaModLoadingContext.get().getModEventBus());
+        fr.cosmicisland.survival.SurvivalRegistry.init(FMLJavaModLoadingContext.get().getModEventBus());
         // Jeux integres (les addons appellent GameRegistry.register de la meme facon)
         GameRegistry.register(new TestGame());
         GameRegistry.register(PoteauxGame.INSTANCE);
@@ -51,6 +55,8 @@ public class CosmicIsland {
     // Chargement des fichiers JSON (admins, roles, equipes)
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        // roles, equipes, saison... sont propres a chaque monde
+        KLFiles.setWorld(event.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT));
         KLFiles.loadAll();
     }
 
@@ -77,7 +83,9 @@ public class CosmicIsland {
             if (InventoryStore.has(player.getUUID()) && !GameManager.isInGame(player.getUUID())) {
                 InventoryStore.restore(player.getServer(), player);
             }
+            fr.cosmicisland.camp.FireNetwork.sendLang(player);
             RoleManager.onJoin(player);
+            SeasonManager.sync(player);
             Vocab.sendTo(player);
             GameManager.onLogin(player);
             fr.cosmicisland.conseil.ConseilManager.onLogin(player);

@@ -62,32 +62,45 @@ public final class KLCommand {
                         .then(Commands.literal("status")
                                 .executes(KLCommand::campfireStatus))
                         .then(Commands.literal("tp")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
                                         .executes(KLCommand::campfireTp)))
                         .then(Commands.literal("set")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
                                         .executes(KLCommand::campfireSet)))
                         .then(Commands.literal("remove")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
                                         .executes(KLCommand::campfireRemove)))
                         .then(Commands.literal("fuel")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
-                                        .then(Commands.argument("valeur", DoubleArgumentType.doubleArg(0.0, 100000.0))
+                                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0, 100000.0))
                                                 .executes(KLCommand::campfireFuel)))))
+                .then(SeasonManager.command())
+                .then(FinaleManager.command())
+                .then(fr.cosmicisland.survival.FoodCommand.command())
                 .then(Commands.literal("say")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
-                        .then(Commands.argument("texte", StringArgumentType.greedyString())
+                        .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(KLCommand::say)))
                 .then(Commands.literal("admin")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
-                        .executes(KLCommand::admin))
+                        .executes(c -> {
+                            fr.cosmicisland.admin.AdminNetwork.sendState(c.getSource().getPlayerOrException(), true);
+                            return 1;
+                        })
+                        .then(Commands.literal("chest").executes(KLCommand::admin)))
+                .then(Commands.literal("gui")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .executes(c -> {
+                            fr.cosmicisland.admin.AdminNetwork.sendState(c.getSource().getPlayerOrException(), true);
+                            return 1;
+                        }))
                 .then(Commands.literal("reload")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .executes(KLCommand::reload))
@@ -96,17 +109,17 @@ public final class KLCommand {
                         .executes(KLCommand::gameList))
                 .then(Commands.literal("enable")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                        .then(Commands.argument("jeu", StringArgumentType.word())
+                        .then(Commands.argument("game", StringArgumentType.word())
                                 .suggests(GAME_IDS)
                                 .executes(c -> setEnabled(c, true))))
                 .then(Commands.literal("disable")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                        .then(Commands.argument("jeu", StringArgumentType.word())
+                        .then(Commands.argument("game", StringArgumentType.word())
                                 .suggests(GAME_IDS)
                                 .executes(c -> setEnabled(c, false))))
                 .then(Commands.literal("start")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
-                        .then(Commands.argument("jeu", StringArgumentType.word())
+                        .then(Commands.argument("game", StringArgumentType.word())
                                 .suggests(GAME_IDS)
                                 .executes(KLCommand::gameStart)))
                 .then(Commands.literal("go")
@@ -121,9 +134,9 @@ public final class KLCommand {
                 .then(Commands.literal("stop")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .executes(c -> gameStop(c, null))
-                        .then(Commands.argument("jeu", StringArgumentType.word())
+                        .then(Commands.argument("game", StringArgumentType.word())
                                 .suggests(GAME_IDS)
-                                .executes(c -> gameStop(c, StringArgumentType.getString(c, "jeu")))))
+                                .executes(c -> gameStop(c, StringArgumentType.getString(c, "game")))))
                 .then(Commands.literal("join")
                         .executes(KLCommand::gameJoin))
                 .then(Commands.literal("decline")
@@ -131,35 +144,35 @@ public final class KLCommand {
                 .then(Commands.literal("spawn")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .then(Commands.literal("set")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(SPAWN_IDS)
                                         .executes(KLCommand::spawnSet)))
                         .then(Commands.literal("tp")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(SPAWN_IDS)
                                         .executes(KLCommand::spawnTp)))
                         .then(Commands.literal("base")
                                 .then(Commands.literal("set")
-                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .then(Commands.argument("team", StringArgumentType.word())
                                                 .suggests(TEAM_IDS)
                                                 .executes(c -> teamSpawnSet(c, "base:"))))
                                 .then(Commands.literal("tp")
-                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .then(Commands.argument("team", StringArgumentType.word())
                                                 .suggests(TEAM_IDS)
                                                 .executes(c -> teamSpawnTp(c, "base:")))))
                         .then(Commands.literal("respawn")
                                 .then(Commands.literal("set")
-                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .then(Commands.argument("team", StringArgumentType.word())
                                                 .suggests(TEAM_IDS)
                                                 .executes(c -> teamSpawnSet(c, "respawn:"))))
                                 .then(Commands.literal("tp")
-                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .then(Commands.argument("team", StringArgumentType.word())
                                                 .suggests(TEAM_IDS)
                                                 .executes(c -> teamSpawnTp(c, "respawn:")))))
                         .then(Commands.literal("game")
-                                .then(Commands.argument("jeu", StringArgumentType.word())
+                                .then(Commands.argument("game", StringArgumentType.word())
                                         .suggests(GAME_IDS)
-                                        .then(Commands.argument("equipe", StringArgumentType.word())
+                                        .then(Commands.argument("team", StringArgumentType.word())
                                                 .suggests(TEAM_IDS)
                                                 .executes(KLCommand::gameZoneSet))))
                         .then(Commands.literal("list")
@@ -167,29 +180,29 @@ public final class KLCommand {
                 .then(Commands.literal("ranking")
                         .executes(c -> rankingTop(c, null))
                         .then(Commands.literal("game")
-                                .then(Commands.argument("jeu", StringArgumentType.word())
+                                .then(Commands.argument("game", StringArgumentType.word())
                                         .suggests(GAME_IDS)
-                                        .executes(c -> rankingTop(c, StringArgumentType.getString(c, "jeu")))))
+                                        .executes(c -> rankingTop(c, StringArgumentType.getString(c, "game")))))
                         .then(Commands.literal("player")
-                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                         .executes(KLCommand::rankingPlayer)))
                         .then(Commands.literal("reset")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                                 .then(Commands.literal("confirm")
                                         .executes(KLCommand::rankingResetConfirm))
-                                .then(Commands.argument("cible", StringArgumentType.word())
+                                .then(Commands.argument("target", StringArgumentType.word())
                                         .suggests(RANK_TARGETS)
                                         .executes(KLCommand::rankingResetAsk)))
                         .then(Commands.literal("add")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
-                                        .then(Commands.argument("jeu", StringArgumentType.word())
+                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
+                                        .then(Commands.argument("game", StringArgumentType.word())
                                                 .suggests(GAME_IDS)
-                                                .then(Commands.argument("nombre", IntegerArgumentType.integer(-100, 100))
+                                                .then(Commands.argument("count", IntegerArgumentType.integer(-100, 100))
                                                         .executes(KLCommand::rankingAdd))))))
                 .then(Commands.literal("placeholder")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
-                        .then(Commands.argument("texte", StringArgumentType.greedyString())
+                        .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(KLCommand::placeholderTest)))
                 .then(Commands.literal("vote")
                         .executes(KLCommand::conseilVote))
@@ -199,15 +212,15 @@ public final class KLCommand {
                 .then(Commands.literal("council")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .then(Commands.literal("start")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
                                         .executes(KLCommand::conseilStart)))
                         .then(Commands.literal("test")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
                                         .executes(c -> conseilTest(c, 3))
-                                        .then(Commands.argument("nombre", IntegerArgumentType.integer(1, 20))
-                                                .executes(c -> conseilTest(c, IntegerArgumentType.getInteger(c, "nombre"))))))
+                                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 20))
+                                                .executes(c -> conseilTest(c, IntegerArgumentType.getInteger(c, "count"))))))
                         .then(Commands.literal("menu")
                                 .executes(KLCommand::conseilMenu))
                         .then(Commands.literal("status")
@@ -224,58 +237,61 @@ public final class KLCommand {
                         .then(Commands.literal("cancel")
                                 .executes(c -> conseilAction(c, "cancel")))
                         .then(Commands.literal("immunity")
-                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                         .executes(KLCommand::conseilImmunity))))
                 .then(Commands.literal("role")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                         .then(Commands.literal("set")
-                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                         .then(Commands.argument("role", StringArgumentType.word())
                                                 .suggests(ROLES)
                                                 .executes(KLCommand::roleSet))))
                         .then(Commands.literal("get")
-                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                         .executes(KLCommand::roleGet))))
                 .then(Commands.literal("team")
                         .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                         .then(Commands.literal("list")
                                 .executes(KLCommand::teamList))
                         .then(Commands.literal("add")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
-                                        .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                        .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                                 .executes(KLCommand::teamAdd))))
                         .then(Commands.literal("remove")
-                                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                         .executes(KLCommand::teamRemove)))
+                        .then(Commands.literal("draw")
+                                .executes(c -> teamDraw(c, false))
+                                .then(Commands.literal("all").executes(c -> teamDraw(c, true))))
                         .then(Commands.literal("name")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
-                                        .then(Commands.argument("texte", StringArgumentType.greedyString())
+                                        .then(Commands.argument("text", StringArgumentType.greedyString())
                                                 .executes(c -> teamEdit(c, true)))))
                         .then(Commands.literal("tag")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
-                                        .then(Commands.argument("texte", StringArgumentType.greedyString())
+                                        .then(Commands.argument("text", StringArgumentType.greedyString())
                                                 .executes(c -> teamEdit(c, false)))))
                         .then(Commands.literal("color")
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
-                                        .then(Commands.argument("couleur", ColorArgument.color())
+                                        .then(Commands.argument("color", ColorArgument.color())
                                                 .executes(KLCommand::teamColor))))
                         .then(Commands.literal("create")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                                 .then(Commands.argument("id", StringArgumentType.word())
-                                        .then(Commands.argument("couleur", ColorArgument.color())
+                                        .then(Commands.argument("color", ColorArgument.color())
                                                 .executes(KLCommand::teamCreate))))
                         .then(Commands.literal("delete")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                                .then(Commands.argument("equipe", StringArgumentType.word())
+                                .then(Commands.argument("team", StringArgumentType.word())
                                         .suggests(TEAM_IDS)
                                         .executes(KLCommand::teamDelete)))
                         .then(Commands.literal("merge")
                                 .executes(KLCommand::teamMerge)
-                                .then(Commands.argument("nom", StringArgumentType.greedyString())
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
                                         .executes(KLCommand::teamMerge)))
                         .then(Commands.literal("unmerge")
                                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
@@ -285,16 +301,16 @@ public final class KLCommand {
         root.then(Commands.literal("merge")
                 .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
                 .executes(KLCommand::teamMerge)
-                .then(Commands.argument("nom", StringArgumentType.greedyString())
+                .then(Commands.argument("name", StringArgumentType.greedyString())
                         .executes(KLCommand::teamMerge)));
 
         // Reponse du staff a un joueur : /ccis reply <joueur> <message> (les joueurs ecrivent avec /admin <message>)
         root.then(Commands.literal("reply")
                 .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
-                .then(Commands.argument("joueur", net.minecraft.commands.arguments.EntityArgument.player())
+                .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
                         .then(Commands.argument("message", StringArgumentType.greedyString())
                                 .executes(c -> {
-                                    ServerPlayer target = net.minecraft.commands.arguments.EntityArgument.getPlayer(c, "joueur");
+                                    ServerPlayer target = net.minecraft.commands.arguments.EntityArgument.getPlayer(c, "player");
                                     String msg = StringArgumentType.getString(c, "message");
                                     fr.cosmicisland.chat.ChatManager.reply(target, c.getSource().getTextName(), msg);
                                     c.getSource().sendSuccess(() -> Txt.ok("Réponse envoyée à " + target.getGameProfile().getName() + "."), false);
@@ -325,19 +341,94 @@ public final class KLCommand {
                             return 1;
                         }))));
 
+        // Roulette d'equilibrage des equipes avant une epreuve
+        root.then(Commands.literal("balance")
+                .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                .executes(c -> {
+                    String err = GameManager.balance();
+                    if (err != null) {
+                        c.getSource().sendFailure(Txt.err(err));
+                        return 0;
+                    }
+                    c.getSource().sendSuccess(() -> Txt.ok("Roulette lancée."), true);
+                    return 1;
+                })
+                .then(Commands.argument("team", StringArgumentType.word())
+                        .suggests(TEAM_IDS)
+                        .executes(c -> {
+                            String err = GameManager.balance(StringArgumentType.getString(c, "team"));
+                            if (err != null) {
+                                c.getSource().sendFailure(Txt.err(err));
+                                return 0;
+                            }
+                            c.getSource().sendSuccess(() -> Txt.ok("Roulette lancée."), true);
+                            return 1;
+                        }))
+                .then(Commands.literal("test")
+                        .executes(c -> balanceTest(c, 6))
+                        .then(Commands.argument("players", IntegerArgumentType.integer(2, 10))
+                                .executes(c -> balanceTest(c, IntegerArgumentType.getInteger(c, "players"))))));
+
+        // Soif
+        root.then(Commands.literal("thirst")
+                .executes(c -> {
+                    ServerPlayer p = c.getSource().getPlayerOrException();
+                    c.getSource().sendSuccess(() -> Txt.info(fr.cosmicisland.survival.ThirstManager.status(p)), false);
+                    return 1;
+                })
+                .then(Commands.literal("set")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                        .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.players())
+                                .then(Commands.argument("value", IntegerArgumentType.integer(0, 100))
+                                        .executes(c -> {
+                                            int v = IntegerArgumentType.getInteger(c, "value");
+                                            int n = 0;
+                                            for (ServerPlayer t : net.minecraft.commands.arguments.EntityArgument.getPlayers(c, "player")) {
+                                                fr.cosmicisland.survival.ThirstManager.setLevel(t, v);
+                                                n++;
+                                            }
+                                            int done = n;
+                                            c.getSource().sendSuccess(() -> Txt.ok("Soif réglée à " + v + " pour " + done + " joueur(s)."), true);
+                                            return n;
+                                        }))))
+                .then(Commands.literal("on")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .executes(c -> {
+                            fr.cosmicisland.survival.ThirstManager.setEnabled(true);
+                            c.getSource().sendSuccess(() -> Txt.ok("Soif activée."), true);
+                            return 1;
+                        }))
+                .then(Commands.literal("off")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .executes(c -> {
+                            fr.cosmicisland.survival.ThirstManager.setEnabled(false);
+                            c.getSource().sendSuccess(() -> Txt.ok("Soif désactivée."), true);
+                            return 1;
+                        })));
+
+        // Donner les objets de survie : /ccis give <marmite|gourde|riz|coquillage> <joueurs> [nombre]
+        root.then(Commands.literal("give")
+                .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
+                .then(Commands.argument("item", StringArgumentType.word())
+                        .suggests((c, b) -> SharedSuggestionProvider.suggest(List.of("pot", "canteen", "rice", "shell", "lighter", "campfire"), b))
+                        .then(Commands.argument("players", net.minecraft.commands.arguments.EntityArgument.players())
+                                .executes(c -> giveSurvival(c, 1))
+                                .then(Commands.argument("count", IntegerArgumentType.integer(1, 64))
+                                        .executes(c -> giveSurvival(c, IntegerArgumentType.getInteger(c, "count")))))));
+
         // Langue des messages (fr / en)
         root.then(Commands.literal("language")
                 .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
                 .executes(c -> {
-                    c.getSource().sendSuccess(() -> Txt.info("Langue actuelle : " + Lang.language() + " (fr ou en)"), false);
+                    c.getSource().sendSuccess(() -> Txt.info("Langue actuelle : " + Lang.language() + " (" + String.join(", ", Lang.available()) + ")"), false);
                     return 1;
                 })
                 .then(Commands.argument("lang", StringArgumentType.word())
-                        .suggests((c, b) -> SharedSuggestionProvider.suggest(List.of("fr", "en"), b))
+                        .suggests((c, b) -> SharedSuggestionProvider.suggest(Lang.available(), b))
                         .executes(c -> {
                             String l = StringArgumentType.getString(c, "lang").toLowerCase();
                             if (!Lang.setLanguage(l)) {
-                                c.getSource().sendFailure(Txt.err("Langues disponibles : fr, en."));
+                                c.getSource().sendFailure(Txt.err("Langues disponibles : " + String.join(", ", Lang.available()) + "."));
                                 return 0;
                             }
                             Vocab.broadcast();
@@ -352,29 +443,33 @@ public final class KLCommand {
                 .then(Commands.argument("page", IntegerArgumentType.integer(1))
                         .executes(c -> showHistory(c, null, IntegerArgumentType.getInteger(c, "page"))))
                 .then(Commands.literal("archive")
-                        .then(Commands.argument("nom", StringArgumentType.word())
+                        .then(Commands.argument("name", StringArgumentType.word())
                                 .suggests((c, b) -> SharedSuggestionProvider.suggest(SeasonHistory.archives(), b))
-                                .executes(c -> showHistory(c, StringArgumentType.getString(c, "nom"), 1))
+                                .executes(c -> showHistory(c, StringArgumentType.getString(c, "name"), 1))
                                 .then(Commands.argument("page", IntegerArgumentType.integer(1))
-                                        .executes(c -> showHistory(c, StringArgumentType.getString(c, "nom"),
-                                                IntegerArgumentType.getInteger(c, "page")))))));
-        root.then(Commands.literal("season")
-                .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
-                .executes(c -> {
-                    c.getSource().sendSuccess(() -> Txt.info("Saison en cours : " + SeasonHistory.data().season
-                            + " (" + SeasonHistory.data().events.size() + " événements, depuis le " + SeasonHistory.data().startedAt + ")"), false);
-                    return 1;
-                })
+                                        .executes(c -> showHistory(c, StringArgumentType.getString(c, "name"),
+                                                IntegerArgumentType.getInteger(c, "page"))))))
                 .then(Commands.literal("new")
-                        .then(Commands.argument("nom", StringArgumentType.greedyString())
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(c -> {
                                     String old = SeasonHistory.data().season;
-                                    SeasonHistory.newSeason(StringArgumentType.getString(c, "nom"));
+                                    SeasonHistory.newSeason(StringArgumentType.getString(c, "name"));
                                     c.getSource().sendSuccess(() -> Txt.ok("« " + old + " » archivée. Nouvelle saison : "
                                             + SeasonHistory.data().season + "."), true);
                                     return 1;
-                                }))));
-
+                                })))
+                .then(Commands.literal("clear")
+                        .requires(s -> KLPermissions.has(s, KLPermissions.ADMIN))
+                        .executes(c -> {
+                            c.getSource().sendSystemMessage(Txt.info("Cela efface le journal de la saison en cours. Pour confirmer : /ccis history clear confirm"));
+                            return 1;
+                        })
+                        .then(Commands.literal("confirm").executes(c -> {
+                            SeasonHistory.clear();
+                            c.getSource().sendSuccess(() -> Txt.ok("Journal de la saison en cours effacé."), true);
+                            return 1;
+                        }))));
         // Abandon volontaire (avec confirmation) et retour d'un elimine
         root.then(Commands.literal("giveup")
                 .executes(c -> {
@@ -396,9 +491,9 @@ public final class KLCommand {
                         })));
         root.then(Commands.literal("revive")
                 .requires(s -> KLPermissions.has(s, KLPermissions.ORGANISATEUR))
-                .then(Commands.argument("joueur", GameProfileArgument.gameProfile())
+                .then(Commands.argument("player", GameProfileArgument.gameProfile())
                         .executes(c -> {
-                            Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(c, "joueur");
+                            Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(c, "player");
                             if (profiles.size() != 1) {
                                 c.getSource().sendFailure(Txt.err("Indique un seul joueur."));
                                 return 0;
@@ -406,14 +501,14 @@ public final class KLCommand {
                             PlayerStatus.askTeam(c.getSource(), profiles.iterator().next());
                             return 1;
                         })
-                        .then(Commands.argument("equipe", StringArgumentType.word())
+                        .then(Commands.argument("team", StringArgumentType.word())
                                 .suggests(TEAM_IDS)
                                 .executes(c -> {
-                                    Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(c, "joueur");
+                                    Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(c, "player");
                                     int n = 0;
                                     for (GameProfile profile : profiles) {
                                         String err = PlayerStatus.revive(c.getSource().getServer(), profile,
-                                                StringArgumentType.getString(c, "equipe"));
+                                                StringArgumentType.getString(c, "team"));
                                         if (err != null) {
                                             c.getSource().sendFailure(Txt.err(err));
                                         } else {
@@ -509,7 +604,7 @@ public final class KLCommand {
     // ---------------------------------------------------------------- roles
 
     private static int roleSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
         KLRole role = KLRole.parse(StringArgumentType.getString(ctx, "role"));
         if (role == null) {
             ctx.getSource().sendFailure(Txt.err("Rôle inconnu. Choix : participant, spectateur, organisateur."));
@@ -528,7 +623,7 @@ public final class KLCommand {
     }
 
     private static int roleGet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
         for (GameProfile profile : profiles) {
             KLRole role = RoleManager.get(profile.getId());
             String msg = profile.getName() + " : "
@@ -542,14 +637,14 @@ public final class KLCommand {
 
     /** Argument "equipe" converti en identifiant interne : accepte l'identifiant (rouge) ou le nom actuel (Phoenix). */
     private static String teamArg(CommandContext<CommandSourceStack> ctx) {
-        String raw = StringArgumentType.getString(ctx, "equipe");
+        String raw = StringArgumentType.getString(ctx, "team");
         String id = TeamManager.resolveId(raw);
         return id != null ? id : raw;
     }
 
     /** Retourne l'equipe de l'argument "equipe", ou null (message d'erreur deja envoye). */
     private static TeamManager.KLTeam findTeam(CommandContext<CommandSourceStack> ctx) {
-        String id = StringArgumentType.getString(ctx, "equipe");
+        String id = StringArgumentType.getString(ctx, "team");
         TeamManager.KLTeam team = TeamManager.get(id);
         if (team == null) {
             ctx.getSource().sendFailure(Txt.err(
@@ -586,7 +681,7 @@ public final class KLCommand {
             return 0;
         }
         String id = teamArg(ctx).toLowerCase();
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
         for (GameProfile profile : profiles) {
             TeamManager.assign(id, profile);
         }
@@ -595,8 +690,38 @@ public final class KLCommand {
         return profiles.size();
     }
 
+    /** Tirage au sort des equipes : les participants sans equipe (ou tous avec "all") sont repartis a parts egales. */
+    private static int teamDraw(CommandContext<CommandSourceStack> ctx, boolean all) {
+        java.util.Map<String, Integer> placed = TeamManager.draw(all);
+        if (placed == null) {
+            ctx.getSource().sendFailure(Txt.err(Tr.s("team.draw.noteams")));
+            return 0;
+        }
+        int total = placed.values().stream().mapToInt(Integer::intValue).sum();
+        if (total == 0) {
+            ctx.getSource().sendFailure(Txt.err(Tr.s("team.draw.nobody")));
+            return 0;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, Integer> e : placed.entrySet()) {
+            TeamManager.KLTeam t = TeamManager.get(e.getKey());
+            sb.append("\n &").append(t.format().getChar()).append("\u25CF ").append(t.name).append(" &7: &f").append(e.getValue());
+        }
+        ctx.getSource().sendSuccess(() -> Txt.ok(Tr.s("team.draw.done", total) + sb), true);
+        int teamCount = placed.size();
+        int inTeams = 0;
+        for (String id : placed.keySet()) {
+            inTeams += TeamManager.get(id).members.size();
+        }
+        if (teamCount > 0 && inTeams % teamCount != 0) {
+            int lower = inTeams / teamCount * teamCount;
+            ctx.getSource().sendSystemMessage(Txt.of(Tr.s("team.draw.uneven", inTeams, teamCount, lower, lower + teamCount)));
+        }
+        return total;
+    }
+
     private static int teamRemove(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
         for (GameProfile profile : profiles) {
             TeamManager.remove(profile);
         }
@@ -610,7 +735,7 @@ public final class KLCommand {
         if (team == null) {
             return 0;
         }
-        String text = StringArgumentType.getString(ctx, "texte");
+        String text = StringArgumentType.getString(ctx, "text");
         if (isName) {
             team.name = text;
             if (team.autoTag) {
@@ -633,7 +758,7 @@ public final class KLCommand {
         if (team == null) {
             return 0;
         }
-        team.color = ColorArgument.getColor(ctx, "couleur").getName();
+        team.color = ColorArgument.getColor(ctx, "color").getName();
         TeamManager.changed();
         ctx.getSource().sendSuccess(() -> Txt.ok("Couleur de l'équipe mise à jour."), true);
         return 1;
@@ -642,7 +767,7 @@ public final class KLCommand {
     private static int teamMerge(CommandContext<CommandSourceStack> ctx) {
         String name = null;
         try {
-            name = StringArgumentType.getString(ctx, "nom");
+            name = StringArgumentType.getString(ctx, "name");
         } catch (IllegalArgumentException ignored) {
             // pas de nom : le nom par defaut du vocabulaire est utilise
         }
@@ -655,7 +780,7 @@ public final class KLCommand {
 
     private static int teamCreate(CommandContext<CommandSourceStack> ctx) {
         String id = StringArgumentType.getString(ctx, "id");
-        String error = TeamManager.createTeam(id, ColorArgument.getColor(ctx, "couleur"));
+        String error = TeamManager.createTeam(id, ColorArgument.getColor(ctx, "color"));
         if (error != null) {
             ctx.getSource().sendFailure(Txt.err(error));
             return 0;
@@ -666,7 +791,7 @@ public final class KLCommand {
     }
 
     private static int teamDelete(CommandContext<CommandSourceStack> ctx) {
-        String error = TeamManager.deleteTeam(StringArgumentType.getString(ctx, "equipe"));
+        String error = TeamManager.deleteTeam(StringArgumentType.getString(ctx, "team"));
         if (error != null) {
             ctx.getSource().sendFailure(Txt.err(error));
             return 0;
@@ -703,7 +828,7 @@ public final class KLCommand {
     }
 
     private static int setEnabled(CommandContext<CommandSourceStack> ctx, boolean enabled) {
-        String id = StringArgumentType.getString(ctx, "jeu");
+        String id = StringArgumentType.getString(ctx, "game");
         GameConfig c = GameRegistry.config(id);
         if (c == null) {
             ctx.getSource().sendFailure(Txt.err("Jeu inconnu : " + id));
@@ -717,7 +842,7 @@ public final class KLCommand {
     }
 
     private static int gameStart(CommandContext<CommandSourceStack> ctx) {
-        String err = GameManager.start(StringArgumentType.getString(ctx, "jeu"));
+        String err = GameManager.start(StringArgumentType.getString(ctx, "game"));
         if (err != null) {
             ctx.getSource().sendFailure(Txt.err(err));
             return 0;
@@ -818,6 +943,7 @@ public final class KLCommand {
         }
         spawnRow(src, "{v_conseil}", "conseil");
         spawnRow(src, "{v_elimination}", "elimination");
+        spawnRow(src, "Jury", "jury");
         return 1;
     }
 
@@ -892,7 +1018,7 @@ public final class KLCommand {
     }
 
     private static int rankingPlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
         for (GameProfile profile : profiles) {
             RankingManager.PlayerStats s = RankingManager.statsOf(profile.getId());
             int total = s == null ? 0 : s.wins;
@@ -914,9 +1040,9 @@ public final class KLCommand {
     }
 
     private static int rankingAdd(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
-        String game = StringArgumentType.getString(ctx, "jeu").toLowerCase();
-        int n = IntegerArgumentType.getInteger(ctx, "nombre");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
+        String game = StringArgumentType.getString(ctx, "game").toLowerCase();
+        int n = IntegerArgumentType.getInteger(ctx, "count");
         if (GameRegistry.get(game) == null) {
             ctx.getSource().sendFailure(Txt.err("Jeu inconnu : " + game));
             return 0;
@@ -930,7 +1056,7 @@ public final class KLCommand {
     }
 
     private static int rankingResetAsk(CommandContext<CommandSourceStack> ctx) {
-        String target = StringArgumentType.getString(ctx, "cible").toLowerCase();
+        String target = StringArgumentType.getString(ctx, "target").toLowerCase();
         if (!target.equals("all") && GameRegistry.get(target) == null) {
             ctx.getSource().sendFailure(Txt.err(
                     "Cible inconnue : " + target + " (utilise all ou l'identifiant d'un jeu)."));
@@ -962,7 +1088,7 @@ public final class KLCommand {
 
     private static int placeholderTest(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        String result = Placeholders.apply(StringArgumentType.getString(ctx, "texte"), player);
+        String result = Placeholders.apply(StringArgumentType.getString(ctx, "text"), player);
         ctx.getSource().sendSuccess(() -> fr.cosmicisland.Txt.of(result), false);
         return 1;
     }
@@ -971,7 +1097,7 @@ public final class KLCommand {
 
     private static final SuggestionProvider<CommandSourceStack> SPAWN_IDS =
             (ctx, builder) -> SharedSuggestionProvider.suggest(
-                    Stream.concat(TeamManager.names().stream(), Stream.of("conseil", "elimination")), builder);
+                    Stream.concat(TeamManager.names().stream(), Stream.of("conseil", "elimination", "jury")), builder);
 
     private static int conseilStart(CommandContext<CommandSourceStack> ctx) {
         String err = ConseilManager.start(teamArg(ctx));
@@ -1024,7 +1150,7 @@ public final class KLCommand {
     }
 
     private static int conseilImmunity(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "joueur");
+        Collection<GameProfile> profiles = GameProfileArgument.getGameProfiles(ctx, "player");
         int done = 0;
         for (GameProfile profile : profiles) {
             String err = ConseilManager.toggleImmune(profile.getId());
@@ -1069,10 +1195,18 @@ public final class KLCommand {
             new HelpEntry("/admin <message>", "Écrire à l'organisation (seul message privé autorisé)", KLPermissions.NONE),
             new HelpEntry("/ccis reply <joueur> <réponse>", "Répondre en privé à un joueur", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis chat global <on|off>", "ON : tout le monde se lit / OFF : chat par équipe", KLPermissions.ADMIN),
+            new HelpEntry("/ccis balance [équipe]", "Roulette : tire au sort les joueurs en trop pour équilibrer les équipes (ex. 5v5 au lieu de 6v5)", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis balance test [joueurs]", "Teste la roulette en solo avec des joueurs fictifs", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis thirst", "Ta soif actuelle", KLPermissions.NONE),
+            new HelpEntry("/ccis thirst set <joueurs> <valeur>", "Règle la soif (0-20)", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis thirst on|off", "Active ou coupe la soif", KLPermissions.ADMIN),
+            new HelpEntry("/ccis give <marmite|gourde|riz|coquillage> <joueurs> [nombre]", "Donne un objet de survie", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis language <fr|en>", "Langue des messages du mod (français / anglais)", KLPermissions.ADMIN),
+            new HelpEntry("/ccis team draw [all]", "Tirage au sort des équipes : répartit les participants sans équipe (ou tout le monde avec all) à parts égales", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis history [page]", "Historique de la saison (éliminations, colliers, fusion...)", KLPermissions.NONE),
             new HelpEntry("/ccis history archive <saison>", "Relire une saison archivée", KLPermissions.NONE),
-            new HelpEntry("/ccis season new <nom>", "Archive la saison en cours et en commence une nouvelle", KLPermissions.ADMIN),
+            new HelpEntry("/ccis history new <nom>", "Archive la saison en cours et en commence une nouvelle", KLPermissions.ADMIN),
+            new HelpEntry("/ccis history clear", "Efface le journal de la saison en cours (avec confirmation)", KLPermissions.ADMIN),
             new HelpEntry("/ccis giveup", "Abandonner l'aventure (avec confirmation) : tu deviens spectateur", KLPermissions.NONE),
             new HelpEntry("/ccis revive <joueur> [équipe]", "Remet un éliminé ou un abandon en jeu : choisis son équipe en cliquant dans le chat (il quitte l'ancienne)", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis base  (ou /base)", "Retourner à la base de ton équipe (impossible pendant une épreuve)", KLPermissions.NONE),
@@ -1101,6 +1235,8 @@ public final class KLCommand {
             new HelpEntry("/ccis role set|get <joueur> [rôle]", "Gérer les rôles (participant, spectateur, organisateur)", KLPermissions.ADMIN),
             new HelpEntry("/ccis enable|disable <jeu>", "Activer ou désactiver un jeu", KLPermissions.ADMIN),
             new HelpEntry("/ccis campfire set|remove|fuel <équipe>", "Définir (en regardant le feu), retirer, régler la jauge", KLPermissions.ADMIN),
+            new HelpEntry("/ccis finale [start|winner <joueur>|vote start|reveal|jury|status|reset]", "Finale : 3 derniers, poteaux, choix de l'adversaire, vote du jury", KLPermissions.ORGANISATEUR),
+            new HelpEntry("/ccis season [start|pause|resume|end|day <n|next>|auto <true|false>|phase <p>|step <e|next>|mergeat <n>|finaleat <n>|reset]", "Déroulement de la saison : jour, phase, étape de l'épisode, tableau de bord", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis merge [nom]", "{v_reunification} (à la main) : crée l'équipe unique, y met tout le monde et annonce", KLPermissions.ORGANISATEUR),
             new HelpEntry("/ccis team create <id> <couleur>", "Crée une équipe (autant que de couleurs, minimum 2 en jeu)", KLPermissions.ADMIN),
             new HelpEntry("/ccis team delete <équipe>", "Supprime une équipe (il en faut au moins 2)", KLPermissions.ADMIN),
@@ -1134,7 +1270,7 @@ public final class KLCommand {
     private static int say(CommandContext<CommandSourceStack> ctx) {
         Component msg = Component.empty()
                 .append(Txt.lit("[Annonce] ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
-                .append(fr.cosmicisland.Txt.of(StringArgumentType.getString(ctx, "texte")));
+                .append(fr.cosmicisland.Txt.of(StringArgumentType.getString(ctx, "text")));
         ctx.getSource().getServer().getPlayerList().broadcastSystemMessage(msg, false);
         return 1;
     }
@@ -1208,7 +1344,7 @@ public final class KLCommand {
     /** Point d'equipe propre a un jeu (remplace le point d'equipe general pour ce jeu). */
     private static int gameZoneSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        String game = StringArgumentType.getString(ctx, "jeu").toLowerCase();
+        String game = StringArgumentType.getString(ctx, "game").toLowerCase();
         if (GameRegistry.get(game) == null) {
             ctx.getSource().sendFailure(Txt.err("Jeu inconnu : " + game));
             return 0;
@@ -1264,7 +1400,7 @@ public final class KLCommand {
             return 0;
         }
         net.minecraft.core.BlockPos pos = ((BlockHitResult) hit).getBlockPos();
-        if (!(player.level().getBlockState(pos).getBlock() instanceof CampfireBlock)) {
+        if (!CampfireManager.isCampfireLike(player.level().getBlockState(pos))) {
             ctx.getSource().sendFailure(Txt.err(
                     "Ce bloc n'est pas un feu de camp. Pose un campfire et regarde-le."));
             return 0;
@@ -1299,7 +1435,7 @@ public final class KLCommand {
             ctx.getSource().sendFailure(Txt.err("Aucun feu défini pour l'équipe " + team.name + "."));
             return 0;
         }
-        double value = DoubleArgumentType.getDouble(ctx, "valeur");
+        double value = DoubleArgumentType.getDouble(ctx, "value");
         CampfireManager.setFuel(id, value);
         String msg = "Jauge du feu de l'équipe " + team.name + " : " + CampfireManager.percent(CampfireManager.get(id)) + "%.";
         ctx.getSource().sendSuccess(() -> Txt.ok(msg), true);
@@ -1339,6 +1475,7 @@ public final class KLCommand {
                 case "collier", "retour", "epreuve" -> ChatFormatting.GREEN;
                 case "egalite" -> ChatFormatting.YELLOW;
                 case "fusion" -> ChatFormatting.LIGHT_PURPLE;
+                case "finale" -> ChatFormatting.GOLD;
                 default -> ChatFormatting.WHITE;
             };
             String icon = switch (e.type) {
@@ -1349,6 +1486,7 @@ public final class KLCommand {
                 case "epreuve" -> "\u2605 ";
                 case "egalite" -> "\u2696 ";
                 case "fusion", "defusion" -> "\u2726 ";
+                case "finale" -> "\u265B ";
                 default -> "\u25B8 ";
             };
             MutableComponent line = Component.empty()
@@ -1359,5 +1497,50 @@ public final class KLCommand {
         }
         src.sendSuccess(() -> Txt.lit("Page " + p + "/" + pages + (pages > 1 ? "  — /ccis history <page>" : "")).withStyle(ChatFormatting.DARK_GRAY), false);
         return 1;
+    }
+
+    private static int balanceTest(CommandContext<CommandSourceStack> ctx, int count) {
+        String err = fr.cosmicisland.game.BalanceRoulette.test(count);
+        if (err != null) {
+            ctx.getSource().sendFailure(Txt.err(err));
+            return 0;
+        }
+        ctx.getSource().sendSuccess(() -> Txt.ok("Roulette de test lancée (" + count + " joueurs fictifs, personne n'est dispensé)."), false);
+        return 1;
+    }
+
+    private static int giveSurvival(CommandContext<CommandSourceStack> ctx, int count) throws CommandSyntaxException {
+        String what = StringArgumentType.getString(ctx, "item").toLowerCase();
+        net.minecraft.world.item.Item item = switch (what) {
+            case "pot", "cooking_pot" -> fr.cosmicisland.survival.SurvivalRegistry.MARMITE.get();
+            case "canteen" -> fr.cosmicisland.survival.SurvivalRegistry.GOURDE.get();
+            case "rice", "raw_rice_bag" -> fr.cosmicisland.survival.SurvivalRegistry.SAC_RIZ.get();
+            case "shell", "rice_shell" -> fr.cosmicisland.survival.SurvivalRegistry.COQUILLAGE_RIZ.get();
+            case "lighter" -> fr.cosmicisland.survival.SurvivalRegistry.ALLUME_FEU.get();
+            case "campfire", "team_campfire" -> fr.cosmicisland.survival.SurvivalRegistry.FEU_ITEM.get();
+            default -> null;
+        };
+        if (item == null) {
+            ctx.getSource().sendFailure(Txt.err("Objet inconnu : " + what + " (pot, canteen, rice, shell, lighter, campfire)."));
+            return 0;
+        }
+        int n = 0;
+        for (ServerPlayer p : net.minecraft.commands.arguments.EntityArgument.getPlayers(ctx, "players")) {
+            net.minecraft.world.item.ItemStack stack = new net.minecraft.world.item.ItemStack(item, item.getMaxStackSize(new net.minecraft.world.item.ItemStack(item)) == 1 ? 1 : count);
+            if (item instanceof fr.cosmicisland.survival.GourdeItem) {
+                fr.cosmicisland.survival.GourdeItem.setSips(stack, fr.cosmicisland.survival.GourdeItem.maxSips(), false);
+            }
+            int times = stack.getCount() == count ? 1 : count;
+            for (int i = 0; i < times; i++) {
+                net.minecraft.world.item.ItemStack copy = stack.copy();
+                if (!p.getInventory().add(copy)) {
+                    p.drop(copy, false);
+                }
+            }
+            n++;
+        }
+        int done = n;
+        ctx.getSource().sendSuccess(() -> Txt.ok("Objet donné à " + done + " joueur(s)."), true);
+        return n;
     }
 }

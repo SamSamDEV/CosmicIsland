@@ -1,0 +1,136 @@
+{
+ "loader": "forge:obj",
+ "model": "cosmicisland:models/item/lighter.obj",
+ "flip_v": true,
+ "automatic_culling": false,
+ "ambientocclusion": false,
+ "gui_light": "side",
+ "textures": {
+  "wood": "cosmicisland:item/plough_wood",
+  "groove": "cosmicisland:item/plough_groove",
+  "bark": "cosmicisland:item/stick_bark",
+  "char": "cosmicisland:item/stick_char",
+  "particle": "cosmicisland:item/plough_wood"
+ },
+ "display": {
+  "gui": {
+   "rotation": [
+    32,
+    215,
+    0
+   ],
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.95,
+    0.95,
+    0.95
+   ]
+  },
+  "ground": {
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    2,
+    0
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ]
+  },
+  "fixed": {
+   "rotation": [
+    0,
+    180,
+    0
+   ],
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.95,
+    0.95,
+    0.95
+   ]
+  },
+  "thirdperson_righthand": {
+   "rotation": [
+    80,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    1.5,
+    3
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ]
+  },
+  "thirdperson_lefthand": {
+   "rotation": [
+    80,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    1.5,
+    3
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ]
+  },
+  "firstperson_righthand": {
+   "rotation": [
+    20,
+    -40,
+    0
+   ],
+   "translation": [
+    0,
+    3,
+    0
+   ],
+   "scale": [
+    0.7,
+    0.7,
+    0.7
+   ]
+  },
+  "firstperson_lefthand": {
+   "rotation": [
+    20,
+    40,
+    0
+   ],
+   "translation": [
+    0,
+    3,
+    0
+   ],
+   "scale": [
+    0.7,
+    0.7,
+    0.7
+   ]
+  }
+ }
+}

@@ -6,9 +6,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Langue des messages du mod (settings.json : "language": "fr" ou "en").
- * Les textes par defaut sont ecrits en francais ; en anglais ils sont traduits a l'affichage par un
- * dictionnaire de phrases (config/cosmicisland/lang_en.json, complete automatiquement et modifiable).
+ * Langue des messages du mod (settings.json : "language": "fr", "en" ou le code d'une langue ajoutee).
+ * Les textes par defaut sont ecrits en francais ; dans les autres langues ils sont traduits a l'affichage par un
+ * dictionnaire de phrases (config/cosmicisland/lang_<code>.json ; lang_en.json est complete automatiquement).
+ * Ajouter une langue = ajouter un fichier lang_<code>.json (meme format que lang_en.json).
  * La traduction fonctionne aussi sur les textes deja sauvegardes dans les configs.
  */
 public final class Lang {
@@ -19,8 +20,8 @@ public final class Lang {
     }
 
     private static Settings settings = new Settings();
-    private static Pattern pattern = null;
-    private static Map<String, String> dict = new LinkedHashMap<>();
+    private static Map<String, Pattern> patterns = new java.util.HashMap<>();
+    private static Map<String, Map<String, String>> dicts = new LinkedHashMap<>();
 
     private static void loadResourceDefaults() {
         try (java.io.InputStream in = Lang.class.getResourceAsStream("/data/cosmicisland/lang_en_defaults.json")) {
@@ -39,58 +40,97 @@ public final class Lang {
     public static void load() {
         loadResourceDefaults();
         settings = KLFiles.load("settings.json", Settings.class, Settings::new);
-        if (settings.language == null) {
+        if (settings.language == null || settings.language.isBlank()) {
             settings.language = "fr";
         }
-        Map<String, String> merged = new LinkedHashMap<>(DEFAULTS);
-        LangFile file = KLFiles.load("lang_en.json", LangFile.class, () -> {
+        dicts = new LinkedHashMap<>();
+        patterns = new java.util.HashMap<>();
+        // Anglais : dictionnaire fourni par le mod, complete automatiquement dans lang_en.json
+        LangFile en = KLFiles.load("lang_en.json", LangFile.class, () -> {
             LangFile f = new LangFile();
             f.phrases = new LinkedHashMap<>(DEFAULTS);
             return f;
         });
-        if (file.phrases != null) {
-            boolean added = false;
-            for (Map.Entry<String, String> e : DEFAULTS.entrySet()) {
-                if (!file.phrases.containsKey(e.getKey())) {
-                    file.phrases.put(e.getKey(), e.getValue());
-                    added = true;
-                }
-            }
-            if (added) {
-                KLFiles.save("lang_en.json", file);
-            }
-            merged = file.phrases;
+        if (en.phrases == null) {
+            en.phrases = new LinkedHashMap<>();
         }
-        dict = merged;
-        pattern = null;
+        boolean added = false;
+        for (Map.Entry<String, String> e : DEFAULTS.entrySet()) {
+            if (!en.phrases.containsKey(e.getKey())) {
+                en.phrases.put(e.getKey(), e.getValue());
+                added = true;
+            }
+        }
+        if (added) {
+            KLFiles.save("lang_en.json", en);
+        }
+        dicts.put("en", en.phrases);
+        // Autres langues : tout fichier config/cosmicisland/lang_<code>.json est une langue de plus
+        try (var files = java.nio.file.Files.list(KLFiles.dir())) {
+            files.map(p -> p.getFileName().toString())
+                    .filter(n -> n.startsWith("lang_") && n.endsWith(".json") && !n.equals("lang_en.json"))
+                    .forEach(n -> {
+                        String code = n.substring(5, n.length() - 5).toLowerCase();
+                        LangFile f = KLFiles.load(n, LangFile.class, LangFile::new);
+                        if (f.phrases != null && !code.isEmpty() && !code.equals("fr")) {
+                            dicts.put(code, f.phrases);
+                        }
+                    });
+        } catch (Exception ignored) {
+            // pas de dossier lisible : seul l'anglais est disponible
+        }
     }
 
     public static class LangFile {
-        public String info = "Phrases françaises -> anglaises, appliquées quand language = en dans settings.json.";
+        public String info = "Phrases françaises -> langue du fichier (lang_<code>.json), appliquées quand language = <code> dans settings.json.";
         public Map<String, String> phrases = new LinkedHashMap<>();
+    }
+
+    private static volatile String synced = null;
+
+    /** Langue recue du serveur (cote client) ; null = utiliser le reglage local. */
+    public static void setSynced(String lang) {
+        synced = lang;
+    }
+
+    /** Langue a utiliser pour les textes affiches par le client. */
+    public static String effective() {
+        return synced != null ? synced : settings.language;
     }
 
     public static String language() {
         return settings.language;
     }
 
+    /** Langues disponibles : le francais (langue des textes d'origine) et chaque dictionnaire lang_<code>.json. */
+    public static java.util.List<String> available() {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        list.add("fr");
+        list.addAll(dicts.keySet());
+        return list;
+    }
+
     public static boolean setLanguage(String lang) {
-        if (!lang.equals("fr") && !lang.equals("en")) {
+        if (!available().contains(lang)) {
             return false;
         }
         settings.language = lang;
         KLFiles.save("settings.json", settings);
+        fr.cosmicisland.camp.FireNetwork.broadcastLang();
         return true;
     }
 
-    /** Traduit un texte si la langue est l'anglais ; sinon le renvoie tel quel. */
+    /** Traduit un texte dans la langue du mod ; en francais (langue d'origine) il est renvoye tel quel. */
     public static String tr(String text) {
-        if (text != null && !"en".equals(settings.language)) {
-            return trCommands(text);
-        }
-        if (text == null || dict.isEmpty()) {
+        String code = settings.language;
+        if (text == null || "fr".equals(code)) {
             return text;
         }
+        Map<String, String> dict = dicts.get(code);
+        if (dict == null || dict.isEmpty()) {
+            return text;
+        }
+        Pattern pattern = patterns.get(code);
         if (pattern == null) {
             StringBuilder sb = new StringBuilder();
             dict.keySet().stream().sorted((a, b) -> b.length() - a.length()).forEach(k -> {
@@ -101,28 +141,17 @@ public final class Lang {
                     sb.append(Pattern.quote(k));
                 }
             });
+            if (sb.length() == 0) {
+                return text;
+            }
             pattern = Pattern.compile(sb.toString());
+            patterns.put(code, pattern);
         }
         Matcher m = pattern.matcher(text);
         StringBuilder out = new StringBuilder();
         while (m.find()) {
-            m.appendReplacement(out, Matcher.quoteReplacement(dict.get(m.group())));
-        }
-        m.appendTail(out);
-        return out.toString();
-    }
-
-    private static final Pattern CMD = Pattern.compile("/ccis [a-z]+(?: [a-z]+)?");
-
-    /** En francais, les commandes citees dans un texte prennent leur nom francais. */
-    private static String trCommands(String text) {
-        if (text.indexOf("/ccis ") < 0) {
-            return text;
-        }
-        Matcher m = CMD.matcher(text);
-        StringBuilder out = new StringBuilder();
-        while (m.find()) {
-            m.appendReplacement(out, Matcher.quoteReplacement(CommandAliases.cmd(m.group())));
+            String rep = dict.get(m.group());
+            m.appendReplacement(out, Matcher.quoteReplacement(rep == null ? m.group() : rep));
         }
         m.appendTail(out);
         return out.toString();

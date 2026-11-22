@@ -31,7 +31,7 @@ public final class ChatManager {
         String text = config.orgaFormat.replace("{joueur}", player.getGameProfile().getName()).replace("{message}", message);
         net.minecraft.network.chat.MutableComponent line = fr.cosmicisland.Txt.of(text).copy().withStyle(net.minecraft.network.chat.Style.EMPTY
                 .withClickEvent(new net.minecraft.network.chat.ClickEvent(net.minecraft.network.chat.ClickEvent.Action.SUGGEST_COMMAND,
-                        "/ccis orga " + player.getGameProfile().getName() + " "))
+                        "/ccis reply " + player.getGameProfile().getName() + " "))
                 .withHoverEvent(new net.minecraft.network.chat.HoverEvent(net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
                         fr.cosmicisland.Txt.lit("Clique pour répondre"))));
         int n = 0;

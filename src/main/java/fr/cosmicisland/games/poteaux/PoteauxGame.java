@@ -637,7 +637,7 @@ public class PoteauxGame implements KLGame {
         GameConfig cfg = GameRegistry.config(ID);
         String text = "Zone : coin 1 = " + describeCorner(cfg, "zonePos1")
                 + " | coin 2 = " + describeCorner(cfg, "zonePos2");
-        ctx.getSource().sendSuccess(() -> Component.literal(text), false);
+        ctx.getSource().sendSuccess(() -> fr.cosmicisland.Txt.lit(text), false);
         return 1;
     }
 
@@ -652,11 +652,11 @@ public class PoteauxGame implements KLGame {
         for (ServerPlayer p : list) {
             BlockPos pole = poleOf(p);
             Component value = pole == null
-                    ? Component.literal("pas sur un poteau").withStyle(ChatFormatting.RED)
-                    : Component.literal("poteau " + pole.getX() + " " + pole.getY() + " " + pole.getZ())
+                    ? fr.cosmicisland.Txt.lit("pas sur un poteau").withStyle(ChatFormatting.RED)
+                    : fr.cosmicisland.Txt.lit("poteau " + pole.getX() + " " + pole.getY() + " " + pole.getZ())
                             .withStyle(ChatFormatting.GREEN);
             Component row = Component.empty()
-                    .append(Component.literal(p.getGameProfile().getName() + " : ")
+                    .append(fr.cosmicisland.Txt.lit(p.getGameProfile().getName() + " : ")
                             .withStyle(ChatFormatting.GRAY, ChatFormatting.BOLD))
                     .append(value);
             ctx.getSource().sendSuccess(() -> row, false);

@@ -75,7 +75,7 @@ public final class SpawnManager {
 
     /** Emplacements qui ne sont pas des equipes : le conseil et le point d'elimination. */
     public static boolean isSpecial(String id) {
-        return id.equals("conseil") || id.equals("elimination");
+        return id.equals("conseil") || id.equals("elimination") || id.equals("jury");
     }
 
     /** Point d'equipe sur la zone de jeu : celui propre au jeu s'il existe, sinon celui de l'equipe. */

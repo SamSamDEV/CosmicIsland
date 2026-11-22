@@ -26,7 +26,7 @@ public final class ConseilAdminMenu {
     /** Ouvre le menu. Retourne un message d'erreur ou null. */
     public static String open(ServerPlayer player) {
         if (ConseilManager.phase() == ConseilManager.Phase.IDLE) {
-            return "{v_conseil} : rien en cours (lance-en un avec /ccis conseil start <équipe>).";
+            return "{v_conseil} : rien en cours (lance-en un avec /ccis council start <équipe>).";
         }
         int count = ConseilManager.candidates().size();
         int rows = Math.max(2, Math.min(6, (count + 8) / 9 + 1));

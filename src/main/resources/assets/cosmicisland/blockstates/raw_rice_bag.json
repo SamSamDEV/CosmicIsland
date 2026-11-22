@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "level=0": {
+   "model": "cosmicisland:block/sac_de_riz_0"
+  },
+  "level=1": {
+   "model": "cosmicisland:block/sac_de_riz_1"
+  },
+  "level=2": {
+   "model": "cosmicisland:block/sac_de_riz_2"
+  },
+  "level=3": {
+   "model": "cosmicisland:block/sac_de_riz_3"
+  },
+  "level=4": {
+   "model": "cosmicisland:block/sac_de_riz_4"
+  }
+ }
+}

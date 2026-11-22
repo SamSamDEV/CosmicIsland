@@ -1,0 +1,135 @@
+{
+ "loader": "forge:obj",
+ "model": "cosmicisland:models/item/rice_shell.obj",
+ "flip_v": true,
+ "automatic_culling": false,
+ "ambientocclusion": false,
+ "gui_light": "side",
+ "textures": {
+  "shell_in": "cosmicisland:item/shell_in",
+  "shell_out": "cosmicisland:item/shell_out",
+  "rice": "cosmicisland:item/shell_rice",
+  "particle": "cosmicisland:item/shell_out"
+ },
+ "display": {
+  "gui": {
+   "rotation": [
+    38,
+    200,
+    0
+   ],
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.75,
+    0.75,
+    0.75
+   ]
+  },
+  "ground": {
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    2,
+    0
+   ],
+   "scale": [
+    0.4,
+    0.4,
+    0.4
+   ]
+  },
+  "fixed": {
+   "rotation": [
+    0,
+    180,
+    0
+   ],
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ]
+  },
+  "thirdperson_righthand": {
+   "rotation": [
+    80,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    1,
+    0.5
+   ],
+   "scale": [
+    0.4,
+    0.4,
+    0.4
+   ]
+  },
+  "thirdperson_lefthand": {
+   "rotation": [
+    80,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    1,
+    0.5
+   ],
+   "scale": [
+    0.4,
+    0.4,
+    0.4
+   ]
+  },
+  "firstperson_righthand": {
+   "rotation": [
+    20,
+    -35,
+    0
+   ],
+   "translation": [
+    0,
+    3,
+    0
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  "firstperson_lefthand": {
+   "rotation": [
+    20,
+    35,
+    0
+   ],
+   "translation": [
+    0,
+    3,
+    0
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  }
+ }
+}

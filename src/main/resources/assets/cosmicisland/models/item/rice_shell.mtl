@@ -1,0 +1,12 @@
+newmtl shell_in
+Kd 1 1 1
+map_Kd #shell_in
+
+newmtl shell_out
+Kd 1 1 1
+map_Kd #shell_out
+
+newmtl rice
+Kd 1 1 1
+map_Kd #rice
+

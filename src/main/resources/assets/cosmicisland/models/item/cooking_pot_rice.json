@@ -1,0 +1,135 @@
+{
+ "loader": "forge:obj",
+ "model": "cosmicisland:models/item/marmite_rice.obj",
+ "flip_v": true,
+ "automatic_culling": false,
+ "ambientocclusion": false,
+ "textures": {
+  "steel": "cosmicisland:item/marmite_iron",
+  "inner": "cosmicisland:item/marmite_inner",
+  "particle": "cosmicisland:item/marmite_iron",
+  "rice": "cosmicisland:item/marmite_rice"
+ },
+ "display": {
+  "gui": {
+   "rotation": [
+    30,
+    225,
+    0
+   ],
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.41,
+    0.41,
+    0.41
+   ]
+  },
+  "ground": {
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "translation": [
+    0,
+    3,
+    0
+   ],
+   "scale": [
+    0.33,
+    0.33,
+    0.33
+   ]
+  },
+  "fixed": {
+   "rotation": [
+    0,
+    180,
+    0
+   ],
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.47,
+    0.47,
+    0.47
+   ]
+  },
+  "firstperson_righthand": {
+   "rotation": [
+    0,
+    -20,
+    0
+   ],
+   "translation": [
+    -4.72,
+    -3.43,
+    -1.72
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  "firstperson_lefthand": {
+   "rotation": [
+    0,
+    20,
+    0
+   ],
+   "translation": [
+    4.72,
+    -3.43,
+    -1.72
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  "thirdperson_righthand": {
+   "rotation": [
+    18,
+    0,
+    0
+   ],
+   "translation": [
+    -6.03,
+    -0.0,
+    -2.31
+   ],
+   "scale": [
+    0.6,
+    0.6,
+    0.6
+   ]
+  },
+  "thirdperson_lefthand": {
+   "rotation": [
+    18,
+    0,
+    0
+   ],
+   "translation": [
+    6.03,
+    -0.0,
+    -2.31
+   ],
+   "scale": [
+    0.6,
+    0.6,
+    0.6
+   ]
+  }
+ },
+ "gui_light": "side"
+}

@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 /**
  * Vocabulaire de la saison (config/cosmicisland/vocabulary.json).
- * Les commandes gardent leurs noms officiels (/ccis conseil, /ccis collier...) ; seuls les textes affiches changent.
+ * Les commandes gardent leurs noms officiels (/ccis council, /ccis bracelet...) ; seuls les textes affiches changent.
  *
  * Utilisable dans TOUS les messages / configs de jeux :
  *   {v_conseil}     -> Éclipse            {v_le_conseil} -> l'Éclipse

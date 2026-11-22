@@ -1,0 +1,27 @@
+{
+ "variants": {
+  "facing=south": {
+   "model": "cosmicisland:block/placed_bracelet"
+  },
+  "facing=west": {
+   "model": "cosmicisland:block/placed_bracelet",
+   "y": 90
+  },
+  "facing=north": {
+   "model": "cosmicisland:block/placed_bracelet",
+   "y": 180
+  },
+  "facing=east": {
+   "model": "cosmicisland:block/placed_bracelet",
+   "y": 270
+  },
+  "facing=up": {
+   "model": "cosmicisland:block/placed_bracelet",
+   "x": 90
+  },
+  "facing=down": {
+   "model": "cosmicisland:block/placed_bracelet",
+   "x": 270
+  }
+ }
+}

@@ -140,6 +140,8 @@ public final class AdminMenus {
                 "&7Top 10 et remises à zéro")));
         c.setItem(16, MenuItems.named(Items.ENDER_PEARL, "&6&lSpawns", List.of(
                 "&7Zones de jeu, bases, respawn,", "&7{v_le_conseil} et {v_elimination}")));
+        c.setItem(19, MenuItems.named(Items.CLOCK, "&6&lSaison", List.of(
+                "&7Jour, phase, étape de l'épisode,", "&7joueurs restants")));
         c.setItem(22, MenuItems.named(Items.REDSTONE, "&c&lRecharger les configs", List.of(
                 "&7Relit tous les fichiers de config.", "&8Admin uniquement")));
         c.setItem(26, MenuItems.named(Items.BARRIER, "&c&lFermer", List.of("&7Ferme le menu")));
@@ -154,6 +156,7 @@ public final class AdminMenus {
                         case 14 -> openConseil(p);
                         case 15 -> openRanking(p);
                         case 16 -> openSpawns(p);
+                        case 19 -> openSeason(p);
                         case 22 -> {
                             if (needAdmin(p)) {
                                 KLFiles.loadAll();
@@ -165,6 +168,49 @@ public final class AdminMenus {
                         default -> { }
                     }
                 });
+    }
+
+    // ------------------------------------------------------------ saison
+
+    private static void openSeason(ServerPlayer player) {
+        SimpleContainer c = new SimpleContainer(27);
+        List<String> info = new ArrayList<>();
+        for (net.minecraft.network.chat.Component line : fr.cosmicisland.SeasonManager.dashboard()) {
+            info.add("&7" + line.getString());
+        }
+        boolean auto = fr.cosmicisland.SeasonManager.data().autoDay;
+        c.setItem(4, MenuItems.named(Items.BOOK, fr.cosmicisland.Tr.s("season.menu.dashboard"), info));
+        c.setItem(10, MenuItems.named(Items.CLOCK, fr.cosmicisland.Tr.s("season.menu.day", fr.cosmicisland.SeasonManager.day()), List.of(
+                fr.cosmicisland.Tr.s("season.menu.day.l1"), fr.cosmicisland.Tr.s("season.menu.day.l2"))));
+        c.setItem(12, MenuItems.named(Items.COMPASS, fr.cosmicisland.Tr.s("season.menu.step", fr.cosmicisland.SeasonManager.step().label()), List.of(
+                fr.cosmicisland.Tr.s("season.menu.step.l1"), fr.cosmicisland.Tr.s("season.menu.step.l2"))));
+        c.setItem(14, MenuItems.named(Items.WHITE_BANNER, fr.cosmicisland.Tr.s("season.menu.phase", fr.cosmicisland.SeasonManager.phase().label()), List.of(
+                fr.cosmicisland.Tr.s("season.menu.phase.l1"), fr.cosmicisland.Tr.s("season.menu.phase.l2"))));
+        c.setItem(16, MenuItems.named(auto ? Items.LIME_DYE : Items.GRAY_DYE,
+                fr.cosmicisland.Tr.s("season.menu.auto", fr.cosmicisland.Tr.s(auto ? "season.menu.on" : "season.menu.off")), List.of(
+                        fr.cosmicisland.Tr.s("season.menu.auto.l1"), fr.cosmicisland.Tr.s("season.menu.auto.l2"))));
+        c.setItem(22, backItem("Menu admin"));
+        KLMenu.openWith(player, Txt.of(fr.cosmicisland.Tr.s("season.menu.title")), 3, c, "admin-season", (p, slot, button) -> {
+            var phases = fr.cosmicisland.SeasonManager.Phase.values();
+            switch (slot) {
+                case 10 -> fr.cosmicisland.SeasonManager.setDay(p.getServer(),
+                        fr.cosmicisland.SeasonManager.day() + (button == 1 ? -1 : 1), button != 1);
+                case 12 -> fr.cosmicisland.SeasonManager.setStep(fr.cosmicisland.SeasonManager.nextStep());
+                case 14 -> {
+                    int i = fr.cosmicisland.SeasonManager.phase().ordinal() + (button == 1 ? -1 : 1);
+                    fr.cosmicisland.SeasonManager.setPhase(phases[(i + phases.length) % phases.length]);
+                }
+                case 16 -> fr.cosmicisland.SeasonManager.toggleAuto(p.getServer());
+                case 22 -> {
+                    openMain(p);
+                    return;
+                }
+                default -> {
+                    return;
+                }
+            }
+            openSeason(p);
+        });
     }
 
     // ------------------------------------------------------------ epreuves
@@ -316,7 +362,7 @@ public final class AdminMenus {
         c.setItem(22, MenuItems.named(Items.NETHER_STAR, "&d&l{v_reunification} des équipes", List.of(
                 "&7État : " + (TeamManager.isMerged() ? "&afusionnées" : "&7séparées"),
                 "&7Tous les joueurs passent dans l'équipe unique.",
-                "&8Organisateur ou admin (nom : /ccis fusion <nom>)")));
+                "&8Organisateur ou admin (nom : /ccis merge <nom>)")));
         c.setItem(26, backItem("Menu principal"));
     }
 
@@ -622,7 +668,7 @@ public final class AdminMenus {
                 lore.add(bar);
                 lore.add(String.format("&7Carburant : &f%.1f&7/&f%.0f &7(%d%%)", f.fuel, CampfireManager.maxFuel(), pct));
                 lore.add("&7Position : &f" + f.x + " " + f.y + " " + f.z);
-                lore.add(out ? "&c&lMALUS ACTIF" : "&aFeu en vie");
+                lore.add(out ? "&c&lFeu éteint" : "&aFeu en vie");
             }
             c.setItem(9 + i, MenuItems.named(item, colorCode(t) + "&l" + t.name, lore));
         }

@@ -55,10 +55,17 @@ public final class SeasonHistory {
         KLFiles.save(CURRENT, data);
     }
 
+    /** Efface le journal de la saison en cours (la saison garde son nom). */
+    public static void clear() {
+        data.events = new ArrayList<>();
+        data.startedAt = now();
+        KLFiles.save(CURRENT, data);
+    }
+
     /** Archive la saison en cours et en demarre une nouvelle. Retourne une erreur ou null. */
     public static String newSeason(String name) {
         String safe = data.season.replaceAll("[^A-Za-z0-9_\\-]", "_");
-        Path archive = KLFiles.dir().resolve("history").resolve(safe + ".json");
+        Path archive = KLFiles.path("history").resolve(safe + ".json");
         if (Files.exists(archive)) {
             safe = safe + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         }
@@ -72,7 +79,7 @@ public final class SeasonHistory {
 
     public static List<String> archives() {
         List<String> out = new ArrayList<>();
-        try (var s = Files.list(KLFiles.dir().resolve("history"))) {
+        try (var s = Files.list(KLFiles.path("history"))) {
             s.map(p -> p.getFileName().toString()).filter(n -> n.endsWith(".json") && !n.equals("current.json"))
                     .sorted().forEach(n -> out.add(n.substring(0, n.length() - 5)));
         } catch (Exception ignored) {
@@ -82,7 +89,7 @@ public final class SeasonHistory {
     }
 
     public static Data readArchive(String name) {
-        if (!name.matches("[A-Za-z0-9_\\-]+") || !Files.exists(KLFiles.dir().resolve("history").resolve(name + ".json"))) {
+        if (!name.matches("[A-Za-z0-9_\\-]+") || !Files.exists(KLFiles.path("history").resolve(name + ".json"))) {
             return null;
         }
         return KLFiles.load("history/" + name + ".json", Data.class, Data::new);

@@ -1,0 +1,12 @@
+newmtl steel
+Kd 1 1 1
+map_Kd #steel
+
+newmtl band
+Kd 1 1 1
+map_Kd #band
+
+newmtl cap
+Kd 1 1 1
+map_Kd #cap
+

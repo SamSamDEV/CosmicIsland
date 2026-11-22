@@ -4,6 +4,7 @@ import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import fr.cosmicisland.CosmicIsland;
+import com.mojang.math.Transformation;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.ItemOverrides;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -24,6 +25,9 @@ import net.minecraftforge.client.model.pipeline.QuadBakingVertexConsumer;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import org.joml.Matrix4f;
+import org.joml.Vector4f;
+
 import java.util.function.Function;
 
 /**
@@ -34,6 +38,15 @@ public final class RingModel {
     private RingModel() {}
 
     public static final class Geometry implements IUnbakedGeometry<Geometry> {
+        final double cx, cy, cz, scale;
+
+        Geometry(double cx, double cy, double cz, double scale) {
+            this.cx = cx;
+            this.cy = cy;
+            this.cz = cz;
+            this.scale = scale;
+        }
+
         @Override
         public BakedModel bake(IGeometryBakingContext context, ModelBaker baker,
                                Function<Material, TextureAtlasSprite> spriteGetter, ModelState modelState,
@@ -42,7 +55,7 @@ public final class RingModel {
             TextureAtlasSprite particle = spriteGetter.apply(context.getMaterial("particle"));
             IModelBuilder<?> builder = IModelBuilder.of(false, context.useBlockLight(), true,
                     context.getTransforms(), overrides, particle, RenderTypeGroup.EMPTY);
-            new Mesh(builder, tex).build();
+            new Mesh(builder, tex, cx, cy, cz, scale, modelState.getRotation()).build();
             return builder.build();
         }
     }
@@ -50,7 +63,12 @@ public final class RingModel {
     public static final class Loader implements IGeometryLoader<Geometry> {
         @Override
         public Geometry read(JsonObject json, JsonDeserializationContext ctx) throws JsonParseException {
-            return new Geometry();
+            // "cx", "cy", "cz" : centre de l'anneau (par defaut : au milieu du bloc, pour l'objet ; le bloc pose le colle a une paroi)
+            double cx = json.has("cx") ? json.get("cx").getAsDouble() : 0.5;
+            double cy = json.has("cy") ? json.get("cy").getAsDouble() : 0.45;
+            double cz = json.has("cz") ? json.get("cz").getAsDouble() : 0.5;
+            double scale = json.has("scale") ? json.get("scale").getAsDouble() : 1.0;
+            return new Geometry(cx, cy, cz, scale);
         }
     }
 
@@ -65,15 +83,24 @@ public final class RingModel {
     // ------------------------------------------------------------------ geometrie
 
     private static final class Mesh {
-        static final double CX = 0.5, CY = 0.45, CZ = 0.5;
-        static final double RM = 0.22, RT = 0.05;      // rayon du cercle / rayon du jonc
+        final double CX, CY, CZ;
+        final double RM, RT;      // rayon du cercle / rayon du jonc (multiplies par "scale")
+        final double scale;
+        final Matrix4f rot;       // rotation du blockstate (x / y) : un modele a loader ne la recoit pas tout seul
         static final int SEG = 20, SIDES = 8;
 
         private final IModelBuilder<?> builder;
         private final TextureAtlasSprite tex;
         private final QuadBakingVertexConsumer baker;
 
-        Mesh(IModelBuilder<?> builder, TextureAtlasSprite tex) {
+        Mesh(IModelBuilder<?> builder, TextureAtlasSprite tex, double cx, double cy, double cz, double scale, Transformation rotation) {
+            this.scale = scale;
+            this.RM = 0.22 * scale;
+            this.RT = 0.05 * scale;
+            this.rot = rotation == null ? new Matrix4f() : rotation.getMatrix();
+            this.CX = cx;
+            this.CY = cy;
+            this.CZ = cz;
             this.builder = builder;
             this.tex = tex;
             this.baker = new QuadBakingVertexConsumer(q -> this.builder.addUnculledFace(q));
@@ -104,7 +131,7 @@ public final class RingModel {
 
         /** Gemme taillee en losange (bipyramide a 4 faces) sertie au sommet du jonc. */
         void gem() {
-            double gy = CY + RM + RT * 0.6, h = 0.09, w = 0.06;   // sertie dans le jonc
+            double gy = CY + RM + RT * 0.6, h = 0.09 * scale, w = 0.06 * scale;   // sertie dans le jonc
             double[] top = {CX, gy + h, CZ}, bot = {CX, gy - h, CZ};
             double[][] e = {{CX + w, gy, CZ}, {CX, gy, CZ + w}, {CX - w, gy, CZ}, {CX, gy, CZ - w}};
             double[] ref = {CX, gy, CZ};
@@ -117,7 +144,16 @@ public final class RingModel {
         }
 
         /** Emet un quad en orientant automatiquement les sommets vers l'exterieur (ref = point a l'interieur du volume). */
-        void quad(double[][] p, float[][] uv, double[] ref) {
+        /** Applique la rotation du blockstate autour du centre du bloc. */
+        double[] turn(double[] v) {
+            Vector4f t = new Vector4f((float) (v[0] - 0.5), (float) (v[1] - 0.5), (float) (v[2] - 0.5), 1f);
+            rot.transform(t);
+            return new double[]{t.x + 0.5, t.y + 0.5, t.z + 0.5};
+        }
+
+        void quad(double[][] p0, float[][] uv, double[] ref0) {
+            double[][] p = {turn(p0[0]), turn(p0[1]), turn(p0[2]), turn(p0[3])};
+            double[] ref = turn(ref0);
             double ax = p[2][0] - p[0][0], ay = p[2][1] - p[0][1], az = p[2][2] - p[0][2];
             double bx = p[3][0] - p[1][0], by = p[3][1] - p[1][1], bz = p[3][2] - p[1][2];
             double nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;

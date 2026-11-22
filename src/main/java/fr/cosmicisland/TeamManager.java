@@ -175,6 +175,60 @@ public final class TeamManager {
         }
     }
 
+    /**
+     * Tirage au sort : repartit les participants au hasard et a parts egales entre les equipes de jeu (hors fusion).
+     * all = false : seuls les participants sans equipe sont tires ; all = true : tout le monde est redistribue.
+     * Retourne le nombre de joueurs places par equipe (id -> nombre), ou null s'il n'y a aucune equipe de jeu.
+     */
+    public static Map<String, Integer> draw(boolean all) {
+        List<String> teamIds = new ArrayList<>();
+        for (String id : store.teams.keySet()) {
+            if (!id.equals(MERGED_ID)) {
+                teamIds.add(id);
+            }
+        }
+        if (teamIds.isEmpty()) {
+            return null;
+        }
+        if (all) {
+            for (String id : teamIds) {
+                store.teams.get(id).members.clear();
+            }
+        }
+        List<Map.Entry<UUID, String>> pool = new ArrayList<>();
+        for (Map.Entry<UUID, String> e : RoleManager.participants().entrySet()) {
+            if (teamIdOf(e.getKey()) == null) {
+                pool.add(e);
+            }
+        }
+        java.util.Collections.shuffle(pool);
+        Map<String, Integer> placed = new java.util.LinkedHashMap<>();
+        for (String id : teamIds) {
+            placed.put(id, 0);
+        }
+        java.util.Random rnd = new java.util.Random();
+        for (Map.Entry<UUID, String> p : pool) {
+            int min = Integer.MAX_VALUE;
+            List<String> smallest = new ArrayList<>();
+            for (String id : teamIds) {
+                int size = store.teams.get(id).members.size();
+                if (size < min) {
+                    min = size;
+                    smallest.clear();
+                }
+                if (size == min) {
+                    smallest.add(id);
+                }
+            }
+            String chosen = smallest.get(rnd.nextInt(smallest.size()));
+            store.teams.get(chosen).members.put(p.getKey().toString(), p.getValue());
+            placed.merge(chosen, 1, Integer::sum);
+        }
+        SeasonHistory.log("tirage", "Tirage au sort des équipes : " + pool.size() + " joueurs répartis.");
+        changed();
+        return placed;
+    }
+
     /** Nombre d'equipes de jeu (hors equipe de fusion). */
     public static int gameTeamCount() {
         int n = 0;
@@ -262,6 +316,8 @@ public final class TeamManager {
         store.merged = true;
         changed();
         SeasonHistory.log("fusion", "{V_le_reunification} : toutes les équipes sont réunies dans « " + target.name + " ».");
+        SeasonManager.onMerge();
+        fr.cosmicisland.camp.CampfireManager.retireAllExcept(MERGED_ID);
         announceFusion();
         return true;
     }
@@ -272,6 +328,7 @@ public final class TeamManager {
             SeasonHistory.log("defusion", "Retour aux équipes séparées.");
         }
         store.merged = false;
+        SeasonManager.onUnmerge();
         if (store.teams.remove(MERGED_ID) != null) {
             fr.cosmicisland.camp.CampfireManager.remove(MERGED_ID);
         }

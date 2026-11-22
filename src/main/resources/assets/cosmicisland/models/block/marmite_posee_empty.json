@@ -1,0 +1,12 @@
+{
+ "loader": "forge:obj",
+ "model": "cosmicisland:models/block/marmite_posee_empty.obj",
+ "flip_v": true,
+ "automatic_culling": false,
+ "ambientocclusion": false,
+ "textures": {
+  "steel": "cosmicisland:item/marmite_iron",
+  "inner": "cosmicisland:item/marmite_inner",
+  "particle": "cosmicisland:item/marmite_iron"
+ }
+}

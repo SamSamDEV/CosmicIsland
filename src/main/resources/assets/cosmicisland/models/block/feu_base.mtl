@@ -1,0 +1,28 @@
+newmtl stone
+Kd 1 1 1
+map_Kd #stone
+
+newmtl stone2
+Kd 1 1 1
+map_Kd #stone2
+
+newmtl stone3
+Kd 1 1 1
+map_Kd #stone3
+
+newmtl dirt
+Kd 1 1 1
+map_Kd #dirt
+
+newmtl log
+Kd 1 1 1
+map_Kd #log
+
+newmtl logtop
+Kd 1 1 1
+map_Kd #logtop
+
+newmtl grill
+Kd 1 1 1
+map_Kd #grill
+

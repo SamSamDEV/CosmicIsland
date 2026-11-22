@@ -1,0 +1,16 @@
+newmtl sack
+Kd 1 1 1
+map_Kd #sack
+
+newmtl rope
+Kd 1 1 1
+map_Kd #rope
+
+newmtl label
+Kd 1 1 1
+map_Kd #label
+
+newmtl rice
+Kd 1 1 1
+map_Kd #rice
+

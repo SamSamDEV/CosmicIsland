@@ -1,0 +1,15 @@
+{
+ "loader": "forge:obj",
+ "flip_v": true,
+ "automatic_culling": false,
+ "ambientocclusion": false,
+ "gui_light": "side",
+ "textures": {
+  "sack": "cosmicisland:item/sack_burlap",
+  "rope": "cosmicisland:item/sack_rope",
+  "label": "cosmicisland:item/sack_label",
+  "rice": "cosmicisland:item/shell_rice",
+  "particle": "cosmicisland:item/sack_burlap"
+ },
+ "model": "cosmicisland:models/item/rice_bag_block_0.obj"
+}

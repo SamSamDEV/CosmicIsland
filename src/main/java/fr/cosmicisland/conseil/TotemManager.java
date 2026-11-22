@@ -108,7 +108,7 @@ public final class TotemManager {
     }
 
     public static void onLogin(ServerPlayer player) {
-        if (!java.nio.file.Files.exists(KLFiles.dir().resolve(FILE))) {
+        if (!java.nio.file.Files.exists(KLFiles.path(FILE))) {
             return;
         }
         Pending pending = KLFiles.load(FILE, Pending.class, Pending::new);

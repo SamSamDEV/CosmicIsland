@@ -67,8 +67,8 @@ public final class BandeauItems {
         event.register(ForgeRegistries.Keys.ITEMS, helper -> {
             BANDEAU = new Band(ArmorItem.Type.HELMET);
             BRASSARD = new Band(ArmorItem.Type.CHESTPLATE);
-            helper.register(new ResourceLocation(CosmicIsland.MODID, "bandeau"), BANDEAU);
-            helper.register(new ResourceLocation(CosmicIsland.MODID, "brassard"), BRASSARD);
+            helper.register(new ResourceLocation(CosmicIsland.MODID, "headband"), BANDEAU);
+            helper.register(new ResourceLocation(CosmicIsland.MODID, "armband"), BRASSARD);
         });
     }
 
