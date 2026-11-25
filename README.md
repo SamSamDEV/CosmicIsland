@@ -10,7 +10,7 @@
 ![Minecraft 1.20.1](https://img.shields.io/badge/Minecraft-1.20.1-green)
 ![Forge 47.4.29](https://img.shields.io/badge/Forge-47.4.29%2B-orange)
 ![Java 17](https://img.shields.io/badge/Java-17-blue)
-![Status](https://img.shields.io/badge/status-1.0.0--Alpha-red)
+![Status](https://img.shields.io/badge/status-0.5.0--Alpha-red)
 ![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
 
 🇬🇧 [English](#-english) · 🇫🇷 [Français](#-français) · 💬 [Commands / Commandes](#-commands--commandes)
@@ -23,7 +23,7 @@
 
 Cosmic Island turns a Minecraft server into a survival island: teams, camps, challenges, tribal councils, the merge and a grand finale. The mod runs the whole season, from the first night to the last jury vote, so hosts can focus on running the game instead of keeping score.
 
-> ⚠️ **1.0.0-Alpha:** the **challenges (immunity and reward games) are not implemented yet.** Hosts run them manually for now. The season flow, council, merge and finale are playable.
+> ⚠️ **0.5.0-Alpha:** the **challenges (immunity and reward games) are not implemented yet.** Hosts run them manually for now. The season flow, council, merge and finale are playable.
 
 ## Features
 
@@ -127,7 +127,7 @@ Set the language with `/ccis language <lang>`. English and French are included. 
 
 Cosmic Island transforme ton serveur Minecraft en île de survie : équipes, camps, épreuves, conseils, fusion et finale. Le mod gère toute la saison, de la première nuit jusqu'au dernier vote du jury, pour que l'équipe d'animation se concentre sur le jeu plutôt que sur les scores.
 
-> ⚠️ **1.0.0-Alpha :** les **épreuves (jeux d'immunité et de récompense) ne sont pas encore implémentées.** Les animateurs les gèrent à la main pour l'instant. Le déroulé de saison, le conseil, la fusion et la finale sont jouables.
+> ⚠️ **0.5.0-Alpha :** les **épreuves (jeux d'immunité et de récompense) ne sont pas encore implémentées.** Les animateurs les gèrent à la main pour l'instant. Le déroulé de saison, le conseil, la fusion et la finale sont jouables.
 
 ## Fonctionnalités
 

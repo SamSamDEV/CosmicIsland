@@ -1,4 +1,4 @@
-# Cosmic Island 1.0.0-Alpha
+# Cosmic Island 0.5.0-Alpha
 *Minecraft 1.20.1 · Forge 47.4.29+ · Java 17*
 
 > ⚠️ **Alpha:** the **challenges (immunity and reward games) are not implemented yet.** Hosts run them manually for now. The season flow, council, merge and finale are playable.
@@ -38,4 +38,4 @@
 
 ## Notes
 - Data from older versions stored in `config/cosmicisland/` is not migrated: copy it by hand into the world's `cosmicisland` folder.
-- Install `Cosmic_Island_v1.0.0-Alpha.jar` on the server and on every client.
+- Install `Cosmic_Island_v0.5.0-Alpha.jar` on the server and on every client.
