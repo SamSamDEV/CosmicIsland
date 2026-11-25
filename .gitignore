@@ -27,3 +27,9 @@ forge*changelog.txt
 # jars
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
+
+# local leftovers
+cosmicisland-fix*
+*.zip
+*.log
+hs_err_pid*
